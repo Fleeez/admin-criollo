@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, X, Calendar, Plus, ExternalLink } from 'lucide-react';
 
 export default function CalendarTab({ appointments, onSelectConversation, addToast }) {
-  const [currentMonth, setCurrentMonth] = useState(4); // 4 = May (0-indexed)
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(2026);
   const [selectedApt, setSelectedApt] = useState(null);
 

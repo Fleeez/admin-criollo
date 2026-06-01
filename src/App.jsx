@@ -205,7 +205,7 @@ export default function App({ session }) {
           </div>
         </div>
 
-        <nav className="nav-menu">
+        <ul className="nav-menu">
           <li className="nav-item">
             <button 
               className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`}
@@ -245,7 +245,7 @@ export default function App({ session }) {
               <span>Integraciones</span>
             </button>
           </li>
-        </nav>
+        </ul>
 
         <div className="sidebar-footer">
           <div className="user-avatar">
