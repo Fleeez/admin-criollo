@@ -1,3 +1,4 @@
+// ⚠️  ARCHIVO PROTEGIDO — no modificar la inicialización del cliente ni agregar throw
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL

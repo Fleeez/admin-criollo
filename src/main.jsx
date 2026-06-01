@@ -1,3 +1,4 @@
+// ⚠️  ARCHIVO PROTEGIDO — no modificar la lógica de sesión ni el triple estado de /login
 import { StrictMode, useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
