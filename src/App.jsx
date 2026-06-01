@@ -8,6 +8,10 @@ import CalendarTab from './components/CalendarTab';
 import IntegrationsTab from './components/IntegrationsTab';
 
 function mapReserva(r) {
+  const e = (r.estado ?? '').toLowerCase();
+  const status = (e === 'cancelada' || e === 'cancelled' || e === 'canceled')
+    ? 'cancelada'
+    : (e === 'completada' || e === 'completed') ? 'completada' : 'pendiente';
   return {
     id: String(r.id),
     name: r.nombre,
@@ -15,7 +19,7 @@ function mapReserva(r) {
     date: r.fecha,
     time: r.hora,
     guests: r.personas,
-    status: r.estado === 'Cancelada' ? 'cancelada' : 'pendiente',
+    status,
   };
 }
 
@@ -237,7 +241,7 @@ export default function App({ session }) {
           </div>
         </div>
 
-        <nav className="nav-menu">
+        <ul className="nav-menu">
           <li className="nav-item">
             <button 
               className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`}
@@ -277,11 +281,14 @@ export default function App({ session }) {
               <span>Integraciones</span>
             </button>
           </li>
-        </nav>
+        </ul>
 
         <div className="sidebar-footer">
           <div className="user-avatar">
-            {session?.user?.email?.slice(0, 2).toUpperCase() ?? 'AD'}
+            {session?.user?.user_metadata?.avatar_url
+              ? <img src={session.user.user_metadata.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+              : (session?.user?.email?.slice(0, 2).toUpperCase() ?? 'AD')
+            }
           </div>
           <div className="user-info">
             <span className="user-name">

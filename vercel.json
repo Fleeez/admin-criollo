@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "_AVISO": "NO MODIFICAR ESTE ARCHIVO — el rewrite /(.*) es crítico para el routing SPA en Vercel",
   "installCommand": "npm ci",
   "buildCommand": "npx vite build",
   "outputDirectory": "dist",
