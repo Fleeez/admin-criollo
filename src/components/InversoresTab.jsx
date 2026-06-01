@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Users, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Users, ExternalLink, X, Save } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
 const ETAPA_STYLE = {
@@ -17,104 +17,292 @@ function fmtDate(iso) {
   });
 }
 
-function DetailField({ label, value, fullWidth }) {
+const INPUT_STYLE = {
+  width: '100%',
+  padding: '8px 12px',
+  fontSize: '13px',
+  border: '1px solid var(--border-color)',
+  borderRadius: '8px',
+  backgroundColor: 'var(--bg-primary)',
+  color: 'var(--text-primary)',
+  fontFamily: 'inherit',
+  outline: 'none',
+  transition: 'border-color 0.2s',
+};
+
+const READONLY_STYLE = {
+  ...INPUT_STYLE,
+  backgroundColor: '#F0EDE8',
+  color: 'var(--text-secondary)',
+  cursor: 'default',
+};
+
+const LABEL_STYLE = {
+  fontSize: '11px',
+  fontWeight: 700,
+  color: 'var(--text-tertiary)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.5px',
+  marginBottom: '5px',
+  display: 'block',
+};
+
+const SECTION_TITLE_STYLE = {
+  fontSize: '12px',
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '1px',
+  marginBottom: '14px',
+  paddingBottom: '8px',
+  borderBottom: '1px solid var(--border-color)',
+};
+
+function Field({ label, children }) {
   return (
-    <div style={{
-      gridColumn: fullWidth ? '1 / -1' : undefined,
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '3px',
-    }}>
-      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-        {label}
-      </span>
-      <span style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: '1.4', wordBreak: 'break-word' }}>
-        {value || '—'}
-      </span>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <label style={LABEL_STYLE}>{label}</label>
+      {children}
     </div>
   );
 }
 
-function LeadDetailPanel({ lead }) {
+function LeadModal({ lead, onClose, onSaved, addToast }) {
+  const [form, setForm] = useState({
+    nombre:              lead.nombre              || '',
+    whatsapp:            lead.whatsapp            || '',
+    capital_disponible:  lead.capital_disponible  || '',
+    linkedin:            lead.linkedin            || '',
+    zona_interes:        lead.zona_interes        || '',
+    experiencia_previa:  lead.experiencia_previa  || '',
+    detalle_experiencia: lead.detalle_experiencia || '',
+    origen_lead:         lead.origen_lead         || '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const { error } = await supabase
+      .from('inversores')
+      .update(form)
+      .eq('id', lead.id);
+    setSaving(false);
+    if (error) {
+      addToast(`Error al guardar: ${error.message}`);
+    } else {
+      addToast('✓ Cambios guardados correctamente');
+      onSaved({ ...lead, ...form });
+      onClose();
+    }
+  };
+
+  // Cerrar con Escape
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const set = (key) => (e) => setForm(prev => ({ ...prev, [key]: e.target.value }));
+
   return (
-    <tr>
-      <td colSpan={9} style={{ padding: 0, borderTop: 'none' }}>
-        <div style={{
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        backgroundColor: 'rgba(30,28,26,0.55)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '20px',
+        backdropFilter: 'blur(2px)',
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
           backgroundColor: 'var(--bg-secondary)',
-          borderTop: '1px solid var(--border-color)',
-          borderBottom: '2px solid var(--accent-gold)',
-          padding: '20px 24px',
+          borderRadius: '20px',
+          boxShadow: 'var(--shadow-lg)',
+          width: '100%',
+          maxWidth: '760px',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '20px 28px',
+          borderBottom: '1px solid var(--border-color)',
+          flexShrink: 0,
         }}>
-          {/* Sección Legal */}
-          <div style={{ marginBottom: '20px' }}>
-            <span style={{
-              fontSize: '11px', fontWeight: 700, color: 'var(--accent-terracotta)',
-              textTransform: 'uppercase', letterSpacing: '1px',
-              display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px'
-            }}>
-              ⚖ Datos Legales — NDA
-            </span>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-              <DetailField label="Estado NDA" value={lead.estado_nda} />
-              <DetailField label="Fecha de Firma" value={fmtDate(lead.fecha_firma)} />
-              <DetailField label="IP del Firmante" value={lead.ip_firmante} />
-              <DetailField label="Dispositivo" value={lead.dispositivo} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div className="user-cell-avatar" style={{ width: '40px', height: '40px', fontSize: '16px', borderRadius: '50%', backgroundColor: 'var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+              {(lead.nombre || lead.email || '?').charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--text-primary)' }}>
+                {lead.nombre || lead.email}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
+                Registrado {fmtDate(lead.created_at)}
+              </div>
             </div>
           </div>
-
-          {/* Sección Perfil */}
-          <div style={{ marginBottom: '20px' }}>
-            <span style={{
-              fontSize: '11px', fontWeight: 700, color: 'var(--accent-olive)',
-              textTransform: 'uppercase', letterSpacing: '1px',
-              display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px'
-            }}>
-              👤 Perfil Profesional
-            </span>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-              <DetailField label="Zona de Interés" value={lead.zona_interes} />
-              <DetailField label="Experiencia Previa" value={lead.experiencia_previa} />
-              <DetailField label="Origen Lead" value={lead.origen_lead} />
-              {lead.linkedin && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>LinkedIn</span>
-                  <a href={lead.linkedin} target="_blank" rel="noreferrer"
-                    className="btn-link" style={{ fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                    <ExternalLink size={12} /> Ver perfil
-                  </a>
-                </div>
-              )}
-              {!lead.linkedin && <DetailField label="LinkedIn" value={null} />}
-              <DetailField label="Detalle Experiencia" value={lead.detalle_experiencia} fullWidth={true} />
-            </div>
-          </div>
-
-          {/* Sección Sistema */}
-          <div>
-            <span style={{
-              fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)',
-              textTransform: 'uppercase', letterSpacing: '1px',
-              display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px'
-            }}>
-              🗂 Sistema
-            </span>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-              <DetailField label="ID" value={String(lead.id)} />
-              <DetailField label="Registrado" value={fmtDate(lead.created_at)} />
-              <DetailField label="Última actualización" value={fmtDate(lead.updated_at)} />
-              <DetailField label="Etapa del formulario" value={lead.etapa_formulario} />
-            </div>
-          </div>
+          <button onClick={onClose} style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: 'var(--text-tertiary)', padding: '6px', borderRadius: '8px',
+            display: 'flex', alignItems: 'center',
+          }}>
+            <X size={20} />
+          </button>
         </div>
-      </td>
-    </tr>
+
+        {/* Body scrollable */}
+        <div style={{ overflowY: 'auto', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+
+          {/* Sección: Datos de contacto (editables) */}
+          <div>
+            <div style={{ ...SECTION_TITLE_STYLE, color: 'var(--accent-olive)' }}>
+              Datos de contacto
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <Field label="Nombre completo">
+                <input style={INPUT_STYLE} value={form.nombre} onChange={set('nombre')} placeholder="Nombre" />
+              </Field>
+              <Field label="Email (no editable — identificador único)">
+                <input style={READONLY_STYLE} value={lead.email || ''} readOnly />
+              </Field>
+              <Field label="WhatsApp">
+                <input style={INPUT_STYLE} value={form.whatsapp} onChange={set('whatsapp')} placeholder="+54 9 11..." />
+              </Field>
+              <Field label="Capital Disponible">
+                <input style={INPUT_STYLE} value={form.capital_disponible} onChange={set('capital_disponible')} placeholder="USD..." />
+              </Field>
+            </div>
+          </div>
+
+          {/* Sección: Perfil profesional (editables) */}
+          <div>
+            <div style={{ ...SECTION_TITLE_STYLE, color: 'var(--accent-olive)' }}>
+              Perfil profesional
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <Field label="LinkedIn">
+                <input style={INPUT_STYLE} value={form.linkedin} onChange={set('linkedin')} placeholder="https://linkedin.com/in/..." />
+              </Field>
+              <Field label="Zona de Interés">
+                <input style={INPUT_STYLE} value={form.zona_interes} onChange={set('zona_interes')} placeholder="CABA, GBA, Interior..." />
+              </Field>
+              <Field label="Experiencia Previa">
+                <input style={INPUT_STYLE} value={form.experiencia_previa} onChange={set('experiencia_previa')} placeholder="Sí / No" />
+              </Field>
+              <Field label="Origen Lead">
+                <input style={INPUT_STYLE} value={form.origen_lead} onChange={set('origen_lead')} placeholder="Instagram, referido..." />
+              </Field>
+              <Field label="Detalle de experiencia">
+                <textarea
+                  style={{ ...INPUT_STYLE, minHeight: '80px', resize: 'vertical' }}
+                  value={form.detalle_experiencia}
+                  onChange={set('detalle_experiencia')}
+                  placeholder="Descripción de experiencia previa..."
+                />
+              </Field>
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: '8px' }}>
+                {lead.documento_pdf_url && (
+                  <a href={lead.documento_pdf_url} target="_blank" rel="noreferrer"
+                    className="btn-link"
+                    style={{ fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '8px', textDecoration: 'none' }}>
+                    <ExternalLink size={14} /> Ver Dossier PDF
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Sección: Datos legales (solo lectura) */}
+          <div>
+            <div style={{ ...SECTION_TITLE_STYLE, color: 'var(--accent-terracotta)' }}>
+              ⚖ Datos Legales — Solo lectura
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <Field label="Estado NDA">
+                <input style={READONLY_STYLE} value={lead.estado_nda || '—'} readOnly />
+              </Field>
+              <Field label="Fecha de Firma del NDA">
+                <input style={READONLY_STYLE} value={fmtDate(lead.fecha_firma)} readOnly />
+              </Field>
+              <Field label="IP del Firmante">
+                <input style={READONLY_STYLE} value={lead.ip_firmante || '—'} readOnly />
+              </Field>
+              <Field label="Dispositivo">
+                <input style={READONLY_STYLE} value={lead.dispositivo || '—'} readOnly />
+              </Field>
+            </div>
+          </div>
+
+          {/* Sección: Sistema (solo lectura) */}
+          <div>
+            <div style={{ ...SECTION_TITLE_STYLE, color: 'var(--text-tertiary)' }}>
+              Sistema — Solo lectura
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
+              <Field label="ID">
+                <input style={READONLY_STYLE} value={String(lead.id)} readOnly />
+              </Field>
+              <Field label="Etapa del formulario">
+                <input style={READONLY_STYLE} value={lead.etapa_formulario || '—'} readOnly />
+              </Field>
+              <Field label="Última actualización">
+                <input style={READONLY_STYLE} value={fmtDate(lead.updated_at)} readOnly />
+              </Field>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          display: 'flex', justifyContent: 'flex-end', gap: '12px',
+          padding: '16px 28px',
+          borderTop: '1px solid var(--border-color)',
+          flexShrink: 0,
+          backgroundColor: 'var(--bg-primary)',
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '9px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
+              border: '1px solid var(--border-color)', backgroundColor: 'transparent',
+              color: 'var(--text-secondary)', cursor: 'pointer',
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{
+              padding: '9px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
+              border: 'none', backgroundColor: 'var(--accent-olive)',
+              color: '#fff', cursor: saving ? 'wait' : 'pointer',
+              display: 'flex', alignItems: 'center', gap: '7px',
+              opacity: saving ? 0.7 : 1,
+            }}
+          >
+            <Save size={14} />
+            {saving ? 'Guardando...' : 'Guardar cambios'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
 export default function InversoresTab({ addToast }) {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState(null);
+  const [selectedLead, setSelectedLead] = useState(null);
 
   useEffect(() => {
     supabase
@@ -138,7 +326,9 @@ export default function InversoresTab({ addToast }) {
     return () => supabase.removeChannel(channel);
   }, []);
 
-  const toggleExpand = (id) => setExpandedId(prev => prev === id ? null : id);
+  const handleSaved = useCallback((updatedLead) => {
+    setLeads(prev => prev.map(l => l.id === updatedLead.id ? updatedLead : l));
+  }, []);
 
   return (
     <div className="dashboard-view">
@@ -175,7 +365,7 @@ export default function InversoresTab({ addToast }) {
         <div className="section-header">
           <h3 className="section-title">Leads de inversores</h3>
           <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-            {loading ? 'Cargando...' : `${leads.length} registros — click en fila para ver detalle legal`}
+            {loading ? 'Cargando...' : `${leads.length} registros — click en fila para editar`}
           </span>
         </div>
 
@@ -183,7 +373,6 @@ export default function InversoresTab({ addToast }) {
           <table className="data-table">
             <thead>
               <tr>
-                <th style={{ width: '32px' }}></th>
                 <th>Nombre</th>
                 <th>Email</th>
                 <th>WhatsApp</th>
@@ -196,61 +385,54 @@ export default function InversoresTab({ addToast }) {
             </thead>
             <tbody>
               {leads.map(lead => (
-                <React.Fragment key={lead.id}>
-                  <tr
-                    onClick={() => toggleExpand(lead.id)}
-                    style={{ cursor: 'pointer' }}
-                    title="Click para ver todos los datos legales"
-                  >
-                    <td style={{ color: 'var(--text-tertiary)', paddingRight: 0 }}>
-                      {expandedId === lead.id
-                        ? <ChevronDown size={15} />
-                        : <ChevronRight size={15} />}
-                    </td>
-                    <td>
-                      <div className="user-cell">
-                        <div className="user-cell-avatar">
-                          {(lead.nombre || lead.email || '?').charAt(0).toUpperCase()}
-                        </div>
-                        <span style={{ fontWeight: 600 }}>{lead.nombre || '—'}</span>
+                <tr
+                  key={lead.id}
+                  onClick={() => setSelectedLead(lead)}
+                  style={{ cursor: 'pointer' }}
+                  title="Click para ver y editar todos los datos"
+                >
+                  <td>
+                    <div className="user-cell">
+                      <div className="user-cell-avatar">
+                        {(lead.nombre || lead.email || '?').charAt(0).toUpperCase()}
                       </div>
-                    </td>
-                    <td style={{ color: 'var(--text-secondary)' }}>{lead.email || '—'}</td>
-                    <td>{lead.whatsapp || '—'}</td>
-                    <td>{lead.capital_disponible || '—'}</td>
-                    <td>
-                      <span className="badge" style={ETAPA_STYLE[lead.etapa_formulario] || DEFAULT_BADGE}>
-                        {lead.etapa_formulario || '—'}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="badge" style={lead.estado_nda === 'Firmado'
-                        ? { backgroundColor: 'rgba(46,125,50,0.1)', color: '#2E7D32' }
-                        : DEFAULT_BADGE}>
-                        {lead.estado_nda || '—'}
-                      </span>
-                    </td>
-                    <td onClick={e => e.stopPropagation()}>
-                      {lead.documento_pdf_url
-                        ? (
-                          <a href={lead.documento_pdf_url} target="_blank" rel="noreferrer"
-                            className="btn-link" style={{ fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <ExternalLink size={13} /> Ver
-                          </a>
-                        ) : (
-                          <span style={{ color: 'var(--text-tertiary)' }}>—</span>
-                        )}
-                    </td>
-                    <td style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                      {fmtDate(lead.created_at)}
-                    </td>
-                  </tr>
-                  {expandedId === lead.id && <LeadDetailPanel lead={lead} />}
-                </React.Fragment>
+                      <span style={{ fontWeight: 600 }}>{lead.nombre || '—'}</span>
+                    </div>
+                  </td>
+                  <td style={{ color: 'var(--text-secondary)' }}>{lead.email || '—'}</td>
+                  <td>{lead.whatsapp || '—'}</td>
+                  <td>{lead.capital_disponible || '—'}</td>
+                  <td>
+                    <span className="badge" style={ETAPA_STYLE[lead.etapa_formulario] || DEFAULT_BADGE}>
+                      {lead.etapa_formulario || '—'}
+                    </span>
+                  </td>
+                  <td>
+                    <span className="badge" style={lead.estado_nda === 'Firmado'
+                      ? { backgroundColor: 'rgba(46,125,50,0.1)', color: '#2E7D32' }
+                      : DEFAULT_BADGE}>
+                      {lead.estado_nda || '—'}
+                    </span>
+                  </td>
+                  <td onClick={e => e.stopPropagation()}>
+                    {lead.documento_pdf_url
+                      ? (
+                        <a href={lead.documento_pdf_url} target="_blank" rel="noreferrer"
+                          className="btn-link" style={{ fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <ExternalLink size={13} /> Ver
+                        </a>
+                      ) : (
+                        <span style={{ color: 'var(--text-tertiary)' }}>—</span>
+                      )}
+                  </td>
+                  <td style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                    {fmtDate(lead.created_at)}
+                  </td>
+                </tr>
               ))}
               {!loading && leads.length === 0 && (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-tertiary)' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-tertiary)' }}>
                     Sin leads registrados aún
                   </td>
                 </tr>
@@ -259,6 +441,15 @@ export default function InversoresTab({ addToast }) {
           </table>
         </div>
       </div>
+
+      {selectedLead && (
+        <LeadModal
+          lead={selectedLead}
+          onClose={() => setSelectedLead(null)}
+          onSaved={handleSaved}
+          addToast={addToast}
+        />
+      )}
     </div>
   );
 }
