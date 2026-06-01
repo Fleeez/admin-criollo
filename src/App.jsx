@@ -7,6 +7,18 @@ import ConversationsTab from './components/ConversationsTab';
 import CalendarTab from './components/CalendarTab';
 import IntegrationsTab from './components/IntegrationsTab';
 
+function mapReserva(r) {
+  return {
+    id: String(r.id),
+    name: r.nombre,
+    phone: r.telefono,
+    date: r.fecha,
+    time: r.hora,
+    guests: r.personas,
+    status: r.estado === 'Cancelada' ? 'cancelada' : 'pendiente',
+  };
+}
+
 export default function App({ session }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [conversations, setConversations] = useState([]);
@@ -15,16 +27,36 @@ export default function App({ session }) {
   const [selectedConvId, setSelectedConvId] = useState(null);
   const [toasts, setToasts] = useState([]);
 
-  // Load initial data
+  // Load conversations & integrations from localStorage, appointments from Supabase
   useEffect(() => {
     const data = loadData();
     setConversations(data.conversations);
-    setAppointments(data.appointments);
     setIntegrations(data.integrations);
-    
     if (data.conversations.length > 0) {
       setSelectedConvId(data.conversations[0].id);
     }
+
+    supabase
+      .from('reservas')
+      .select('*')
+      .order('fecha_iso', { ascending: true })
+      .then(({ data: rows, error }) => {
+        if (error) { console.error('[Panel] Error cargando reservas:', error); return; }
+        setAppointments((rows || []).map(mapReserva));
+      });
+
+    const channel = supabase
+      .channel('reservas-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservas' }, () => {
+        supabase
+          .from('reservas')
+          .select('*')
+          .order('fecha_iso', { ascending: true })
+          .then(({ data: rows }) => setAppointments((rows || []).map(mapReserva)));
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
   }, []);
 
   // Toast notification manager
