@@ -1065,6 +1065,7 @@ input:checked + .slider:before {
   flex-direction: column;
   justify-content: flex-start;
   transition: var(--transition-fast);
+  overflow: visible;
 }
 
 .calendar-cell.outside-month {
@@ -1102,8 +1103,7 @@ input:checked + .slider:before {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  flex: 1;
-  overflow-y: auto;
+  width: 100%;
 }
 
 .apt-tag {

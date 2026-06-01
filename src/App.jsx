@@ -34,7 +34,7 @@ export default function App({ session }) {
     }
 
     // Cargar reservas reales desde Supabase via API
-    fetch('/api/reservas')
+    fetch('/api/reservas', { cache: 'no-store' })
       .then(r => r.json())
       .then(rows => {
         if (!Array.isArray(rows)) return;
