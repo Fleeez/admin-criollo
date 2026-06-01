@@ -7,6 +7,15 @@ import ConversationsTab from './components/ConversationsTab';
 import CalendarTab from './components/CalendarTab';
 import IntegrationsTab from './components/IntegrationsTab';
 
+function mapEstado(estado) {
+  if (!estado) return 'pendiente';
+  const e = estado.toLowerCase();
+  if (e === 'confirmada' || e === 'confirmed') return 'pendiente';
+  if (e === 'completada' || e === 'completed') return 'completada';
+  if (e === 'cancelada' || e === 'cancelled' || e === 'canceled') return 'cancelada';
+  return 'pendiente';
+}
+
 export default function App({ session }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [conversations, setConversations] = useState([]);
@@ -19,12 +28,31 @@ export default function App({ session }) {
   useEffect(() => {
     const data = loadData();
     setConversations(data.conversations);
-    setAppointments(data.appointments);
     setIntegrations(data.integrations);
-    
     if (data.conversations.length > 0) {
       setSelectedConvId(data.conversations[0].id);
     }
+
+    // Cargar reservas reales desde Supabase via API
+    fetch('/api/reservas')
+      .then(r => r.json())
+      .then(rows => {
+        if (!Array.isArray(rows)) return;
+        const mapped = rows.map(r => ({
+          id:     String(r.id),
+          name:   r.nombre,
+          phone:  r.telefono,
+          date:   r.fecha,
+          time:   r.hora,
+          guests: r.personas,
+          status: mapEstado(r.estado),
+        }));
+        setAppointments(mapped);
+      })
+      .catch(() => {
+        // Fallback a mock si falla la API
+        setAppointments(data.appointments);
+      });
   }, []);
 
   // Toast notification manager
