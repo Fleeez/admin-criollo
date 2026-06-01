@@ -277,7 +277,10 @@ export default function App({ session }) {
 
         <div className="sidebar-footer">
           <div className="user-avatar">
-            {session?.user?.email?.slice(0, 2).toUpperCase() ?? 'AD'}
+            {session?.user?.user_metadata?.avatar_url
+              ? <img src={session.user.user_metadata.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+              : (session?.user?.email?.slice(0, 2).toUpperCase() ?? 'AD')
+            }
           </div>
           <div className="user-info">
             <span className="user-name">

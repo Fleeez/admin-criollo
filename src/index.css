@@ -548,6 +548,8 @@ button, input, select, textarea {
   display: flex;
   flex-direction: column;
   background-color: rgba(243, 239, 234, 0.15);
+  overflow: hidden;
+  height: 100%;
 }
 
 .chat-list-header {
@@ -670,6 +672,8 @@ button, input, select, textarea {
   flex-direction: column;
   height: 100%;
   background-color: var(--bg-secondary);
+  overflow: hidden;
+  min-height: 0;
 }
 
 .chat-window-header {
@@ -792,6 +796,7 @@ input:checked + .slider:before {
 /* Chat Messages Flow */
 .chat-messages-container {
   flex: 1;
+  min-height: 0;
   padding: 24px;
   overflow-y: auto;
   background-color: rgba(250, 248, 245, 0.7);
