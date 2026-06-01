@@ -27,7 +27,13 @@ function Root() {
       <Routes>
         <Route
           path="/login"
-          element={session ? <Navigate to="/" replace /> : <LoginPage />}
+          element={
+            session === undefined
+              ? <div className="loading-screen" />
+              : session
+                ? <Navigate to="/" replace />
+                : <LoginPage />
+          }
         />
         <Route
           path="/*"
