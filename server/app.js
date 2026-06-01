@@ -1,5 +1,5 @@
-const express = require('express');
-const webhookRouter = require('./routes/webhook');
+import express from 'express';
+import webhookRouter from './routes/webhook.js';
 
 const app = express();
 
@@ -11,4 +11,4 @@ app.get('/health', (_req, res) => {
 
 app.use('/webhook', webhookRouter);
 
-module.exports = app;
+export default app;

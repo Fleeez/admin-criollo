@@ -1,5 +1,5 @@
-const express = require('express');
-const supabase = require('../config/supabase');
+import express from 'express';
+import supabase from '../config/supabase.js';
 
 const router = express.Router();
 
@@ -21,9 +21,6 @@ router.get('/', (req, res) => {
 });
 
 // POST /webhook — Recepción de mensajes entrantes de WhatsApp
-// En serverless (Vercel) el proceso muere al enviar la respuesta,
-// por eso se await el insert ANTES de responder. Supabase es <200ms,
-// bien dentro del timeout de 20s que permite Meta.
 router.post('/', async (req, res) => {
   await procesarMensaje(req.body);
   res.sendStatus(200);
@@ -55,12 +52,7 @@ async function procesarMensaje(body) {
 
     const { error } = await supabase
       .from('mensajes')
-      .insert({
-        telefono,
-        mensaje: texto,
-        origen:  'whatsapp',
-        leido:   false,
-      });
+      .insert({ telefono, mensaje: texto, origen: 'whatsapp', leido: false });
 
     if (error) {
       console.error('[SUPABASE] Error al insertar mensaje:', error.message);
@@ -72,4 +64,4 @@ async function procesarMensaje(body) {
   }
 }
 
-module.exports = router;
+export default router;
