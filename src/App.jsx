@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, MessageSquare, Calendar, Settings, AlertCircle, LogOut } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Calendar, Settings, AlertCircle, LogOut, Users } from 'lucide-react';
 import { loadData, saveData, STORAGE_KEYS } from './mockData';
 import { supabase } from './lib/supabaseClient';
 import DashboardTab from './components/DashboardTab';
 import ConversationsTab from './components/ConversationsTab';
 import CalendarTab from './components/CalendarTab';
 import IntegrationsTab from './components/IntegrationsTab';
+import InversoresTab from './components/InversoresTab';
 
 function mapReserva(r) {
   const e = (r.estado ?? '').toLowerCase();
@@ -208,12 +209,14 @@ export default function App({ session }) {
         );
       case 'integraciones':
         return (
-          <IntegrationsTab 
+          <IntegrationsTab
             integrations={integrations}
             onSaveIntegrations={handleSaveIntegrations}
             addToast={addToast}
           />
         );
+      case 'inversores':
+        return <InversoresTab addToast={addToast} />;
       default:
         return <div style={{ padding: '40px' }}>Sección no encontrada</div>;
     }
@@ -225,6 +228,7 @@ export default function App({ session }) {
       case 'conversaciones': return 'Supervisor de Conversaciones';
       case 'citas': return 'Reservas & Citas';
       case 'integraciones': return 'Integraciones de APIs';
+      case 'inversores': return 'Leads de Inversores';
       default: return 'Gestión';
     }
   };
@@ -273,12 +277,22 @@ export default function App({ session }) {
           </li>
 
           <li className="nav-item">
-            <button 
+            <button
               className={`nav-link ${activeTab === 'integraciones' ? 'active' : ''}`}
               onClick={() => setActiveTab('integraciones')}
             >
               <Settings className="nav-icon" />
               <span>Integraciones</span>
+            </button>
+          </li>
+
+          <li className="nav-item">
+            <button
+              className={`nav-link ${activeTab === 'inversores' ? 'active' : ''}`}
+              onClick={() => setActiveTab('inversores')}
+            >
+              <Users className="nav-icon" />
+              <span>Inversores</span>
             </button>
           </li>
         </ul>
