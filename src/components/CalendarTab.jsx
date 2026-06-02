@@ -20,6 +20,8 @@ function StatusBadge({ status }) {
     return <span className="badge badge-bot">Completada</span>;
   if (status === 'cancelada')
     return <span className="badge badge-manual">Cancelada</span>;
+  if (status === 'confirmada')
+    return <span className="badge" style={{ background: 'rgba(67,160,71,0.13)', color: '#2E7D32', border: '1px solid rgba(67,160,71,0.35)' }}>Confirmada</span>;
   return (
     <span className="badge" style={{ background: 'rgba(212,163,115,0.18)', color: '#8B6914', border: '1px solid rgba(212,163,115,0.4)' }}>
       Pendiente
@@ -202,6 +204,7 @@ function ReservaFormModal({ mode, apt, prefillDate, onSave, onClose, addToast })
               <div>
                 <label style={lbl}>Estado</label>
                 <select style={inp} value={form.estado} onChange={e => set('estado', e.target.value)}>
+                  <option value="confirmada">Confirmada</option>
                   <option value="pendiente">Pendiente</option>
                   <option value="completada">Completada</option>
                   <option value="cancelada">Cancelada</option>

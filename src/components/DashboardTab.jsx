@@ -37,8 +37,9 @@ export default function DashboardTab({ conversations, appointments, onNavigateTo
   const todaySorted = [...todayReservas].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 
   const statusLabel = (s) => {
-    if (s === 'completada') return <span className="badge badge-bot">Completada</span>;
-    if (s === 'cancelada')  return <span className="badge badge-manual">Cancelada</span>;
+    if (s === 'completada')  return <span className="badge badge-bot">Completada</span>;
+    if (s === 'cancelada')   return <span className="badge badge-manual">Cancelada</span>;
+    if (s === 'confirmada')  return <span className="badge" style={{ background: 'rgba(67,160,71,0.13)', color: '#2E7D32', border: '1px solid rgba(67,160,71,0.35)' }}>Confirmada</span>;
     return <span className="badge" style={{ background: 'rgba(212,163,115,0.18)', color: '#8B6914', border: '1px solid rgba(212,163,115,0.4)' }}>Pendiente</span>;
   };
 

@@ -15,7 +15,9 @@ function mapReserva(r) {
   const e = (r.estado ?? '').toLowerCase();
   const status = (e === 'cancelada' || e === 'cancelled' || e === 'canceled')
     ? 'cancelada'
-    : (e === 'completada' || e === 'completed') ? 'completada' : 'pendiente';
+    : (e === 'completada' || e === 'completed') ? 'completada'
+    : (e === 'confirmada') ? 'confirmada'
+    : 'pendiente';
   return {
     id: String(r.id),
     name: r.nombre,
