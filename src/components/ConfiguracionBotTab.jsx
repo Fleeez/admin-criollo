@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Bot, Save, Star, FileText, Link, Users, Zap, Calendar, Upload, X } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
-const FRANQUICIA_ID = '1'; // string — coincide con columna TEXT en Supabase
+const FRANQUICIA_ID = 'demo-restaurant';
 
 export default function ConfiguracionBotTab({ addToast }) {
   const [botEncendido,    setBotEncendido]    = useState(true);

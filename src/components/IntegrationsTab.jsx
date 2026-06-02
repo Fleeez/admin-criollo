@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Save, Copy, Check, Info, Server, Calendar, MessageCircle, Loader } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
-const FRANQUICIA_ID = '1';
+const FRANQUICIA_ID = 'demo-restaurant';
 
 export default function IntegrationsTab({ addToast }) {
   const [formData, setFormData] = useState({
