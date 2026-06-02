@@ -1638,6 +1638,63 @@ input:checked + .slider:before {
   }
 }
 
+/* ─── Dark Mode ──────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg-primary:    #1A1714;
+  --bg-secondary:  #231F1C;
+  --bg-sidebar:    #1E1A17;
+  --text-primary:  #F0EBE3;
+  --text-secondary:#B0A89E;
+  --text-tertiary: #7A7068;
+  --border-color:  #3A3430;
+}
+
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .section-card,
+[data-theme="dark"] .form-section,
+[data-theme="dark"] .modal-content,
+[data-theme="dark"] .webhook-info-panel {
+  background: #231F1C;
+  border-color: #3A3430;
+}
+
+[data-theme="dark"] .data-table thead tr { background: #2A2420; }
+[data-theme="dark"] .data-table tbody tr:hover { background: #2E2926; }
+[data-theme="dark"] .data-table tbody td { border-color: #3A3430; }
+[data-theme="dark"] .data-table thead th { border-color: #3A3430; color: var(--text-secondary); }
+
+[data-theme="dark"] .form-input,
+[data-theme="dark"] .search-input,
+[data-theme="dark"] .chat-textarea {
+  background: #2A2420;
+  color: var(--text-primary);
+  border-color: #3A3430;
+}
+
+[data-theme="dark"] .sql-script-box { background: #0e0c0b; color: #d4a96b; }
+
+[data-theme="dark"] .calendar-cell {
+  background: #231F1C;
+  border-color: #3A3430;
+}
+[data-theme="dark"] .calendar-cell.today { background: rgba(192,92,62,0.12); }
+[data-theme="dark"] .calendar-day-label { background: #1E1A17; color: var(--text-tertiary); }
+
+[data-theme="dark"] .chat-list-panel,
+[data-theme="dark"] .chat-window { border-color: #3A3430; }
+[data-theme="dark"] .chat-item:hover,
+[data-theme="dark"] .chat-item.active { background: #2A2420; }
+[data-theme="dark"] .chat-window-header { background: #231F1C; border-color: #3A3430; }
+[data-theme="dark"] .chat-messages-container { background: #1A1714; }
+[data-theme="dark"] .message-bubble { background: #2A2420; border-color: #3A3430; }
+[data-theme="dark"] .msg-right .message-bubble { background: rgba(192,92,62,0.18); }
+[data-theme="dark"] .chat-input-bar { background: #231F1C; border-color: #3A3430; }
+
+[data-theme="dark"] .app-header { background: #231F1C; border-color: #3A3430; }
+[data-theme="dark"] .sidebar-footer { border-color: #3A3430; }
+[data-theme="dark"] .nav-link:hover { background: rgba(255,255,255,0.05); }
+[data-theme="dark"] .nav-link.active { background: rgba(192,92,62,0.2); }
+
 /* ─── Empty state inline ─────────────────────────────────────── */
 .empty-state-inline {
   display: flex;

@@ -163,7 +163,7 @@ export default function DashboardTab({ conversations, appointments, onNavigateTo
           {urgentChats.length === 0 ? (
             <div className="empty-state-inline">
               <CheckCircle size={28} style={{ color: 'var(--accent-olive)' }} />
-              <span style={{ color: 'var(--accent-olive)' }}>Todo en orden — el bot está activo</span>
+              <span style={{ color: 'var(--accent-olive)' }}>Todo en orden — Bruno está activo</span>
             </div>
           ) : (
             <div className="data-table-wrapper">

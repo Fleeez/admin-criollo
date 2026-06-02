@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, MessageSquare, Calendar, Settings, AlertCircle, LogOut, Users } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Calendar, Settings, AlertCircle, LogOut, Users, Moon, Sun } from 'lucide-react';
 import { loadData, saveData, STORAGE_KEYS } from './mockData';
 import { supabase } from './lib/supabaseClient';
 import DashboardTab from './components/DashboardTab';
@@ -31,6 +31,15 @@ export default function App({ session }) {
   const [integrations, setIntegrations] = useState({});
   const [selectedConvId, setSelectedConvId] = useState(null);
   const [toasts, setToasts] = useState([]);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('criollo_dark') === '1');
+
+  const toggleDarkMode = () => {
+    setDarkMode(prev => {
+      const next = !prev;
+      localStorage.setItem('criollo_dark', next ? '1' : '0');
+      return next;
+    });
+  };
 
   // Load conversations & integrations from localStorage, appointments from Supabase
   useEffect(() => {
@@ -84,7 +93,7 @@ export default function App({ session }) {
     const updated = conversations.map(c => {
       if (c.id === convId) {
         const nextState = !c.botActive;
-        addToast(nextState ? '✓ Bot reactivado para esta conversación' : '⏸ Bot pausado (atención humana activa)');
+        addToast(nextState ? '✓ Bruno reactivado para esta conversación' : '⏸ Bruno pausado (atención humana activa)');
         return { ...c, botActive: nextState };
       }
       return c;
@@ -111,7 +120,7 @@ export default function App({ session }) {
         // When sending manually, bot is automatically paused
         const wasActive = c.botActive;
         if (wasActive) {
-          addToast('Intervención humana: Bot pausado automáticamente');
+          addToast('Intervención humana: Bruno pausado automáticamente');
         }
 
         return {
@@ -171,6 +180,14 @@ export default function App({ session }) {
     }, 3000);
   };
 
+  // Move appointment to a new date (drag & drop in CalendarTab)
+  const handleMoveAppointment = async (aptId, newDate) => {
+    setAppointments(prev => prev.map(a => a.id === aptId ? { ...a, date: newDate } : a));
+    try {
+      await supabase.from('reservas').update({ fecha: newDate }).eq('id', aptId);
+    } catch (_) { /* Realtime subscription will sync regardless */ }
+  };
+
   // Save integrations
   const handleSaveIntegrations = (newIntegrations) => {
     setIntegrations(newIntegrations);
@@ -204,6 +221,7 @@ export default function App({ session }) {
           <CalendarTab
             appointments={appointments}
             onSelectConversation={handleSelectConversation}
+            onMoveAppointment={handleMoveAppointment}
             addToast={addToast}
           />
         );
@@ -234,7 +252,7 @@ export default function App({ session }) {
   };
 
   return (
-    <div className="app-container">
+    <div className="app-container" data-theme={darkMode ? 'dark' : 'light'}>
       {/* Sidebar Navigation */}
       <aside className="sidebar">
         <div className="logo-section">
@@ -328,6 +346,13 @@ export default function App({ session }) {
           </div>
           
           <div className="header-status-bar">
+            <button
+              onClick={toggleDarkMode}
+              title={darkMode ? 'Modo claro' : 'Modo oscuro'}
+              style={{ background: 'none', border: '1px solid var(--border-color)', borderRadius: 8, cursor: 'pointer', padding: '6px 10px', display: 'flex', alignItems: 'center', color: 'var(--text-secondary)', marginRight: 8, transition: 'var(--transition-fast)' }}
+            >
+              {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
             {integrations.supabaseUrl && (
               <span className="status-badge connected">
                 <span className="dot"></span> Supabase Conectado

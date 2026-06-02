@@ -187,8 +187,8 @@ create table appointments (
           </div>
         </div>
 
-        {/* Supabase Section */}
-        <div className="form-section">
+        {/* Supabase Section — hidden: credentials managed server-side */}
+        {false && <div className="form-section" style={{display:'none'}}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
             <Server size={22} color="var(--accent-gold)" />
             <h3 className="form-section-title" style={{ marginBottom: 0 }}>Base de Datos Supabase</h3>
@@ -232,7 +232,7 @@ create table appointments (
               <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{sqlSchema}</pre>
             </div>
           </div>
-        </div>
+        </div>}
 
         {/* Google Calendar Section */}
         <div className="form-section">
@@ -241,7 +241,7 @@ create table appointments (
             <h3 className="form-section-title" style={{ marginBottom: 0 }}>Integración Google Calendar API</h3>
           </div>
           <p className="form-section-desc">
-            Agenda de forma automática las reservas acordadas por el bot de WhatsApp en el calendario de tu restaurante.
+            Agenda de forma automática las reservas acordadas por Bruno en el calendario de tu restaurante.
           </p>
 
           <div className="form-group" style={{ marginBottom: '20px' }}>

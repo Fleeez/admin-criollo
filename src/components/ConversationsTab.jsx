@@ -78,7 +78,7 @@ export default function ConversationsTab({
                   <div className="chat-item-bottom">
                     <span className="chat-item-msg">{conv.lastMessage}</span>
                     <span className={`badge ${conv.botActive ? 'badge-bot' : 'badge-manual'}`} style={{ fontSize: '9px', padding: '2px 6px' }}>
-                      {conv.botActive ? 'Bot' : 'Manual'}
+                      {conv.botActive ? 'Bruno' : 'Manual'}
                     </span>
                   </div>
                 </div>
@@ -113,13 +113,13 @@ export default function ConversationsTab({
               <div className="chat-window-name-section">
                 <span className="chat-window-name">{selectedConv.name}</span>
                 <span className={`chat-window-status ${selectedConv.botActive ? 'bot-active' : 'bot-paused'}`}>
-                  {selectedConv.botActive ? '• Bot Activo' : '• Intervención Manual'}
+                  {selectedConv.botActive ? '• Bruno Activo' : '• Intervención Manual'}
                 </span>
               </div>
             </div>
 
             <div className="bot-toggle-wrapper">
-              <span className="bot-toggle-label">Bot activo</span>
+              <span className="bot-toggle-label">Bruno activo</span>
               <label className="switch">
                 <input 
                   type="checkbox" 
@@ -159,7 +159,7 @@ export default function ConversationsTab({
           <form className="chat-input-bar" onSubmit={handleSendMessage}>
             <textarea 
               className="chat-textarea" 
-              placeholder={selectedConv.botActive ? "Escribe un mensaje para intervenir (esto pausará el bot)..." : "Responder como humano..."}
+              placeholder={selectedConv.botActive ? "Escribe un mensaje para intervenir (esto pausará a Bruno)..." : "Responder como humano..."}
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
               onKeyDown={(e) => {
