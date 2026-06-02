@@ -394,15 +394,6 @@ export default function App({ session }) {
             </button>
           </li>
 
-          <li className="nav-item">
-            <button
-              className={`nav-link ${activeTab === 'integraciones' ? 'active' : ''}`}
-              onClick={() => setActiveTab('integraciones')}
-            >
-              <Settings className="nav-icon" />
-              <span>Integraciones</span>
-            </button>
-          </li>
         </ul>
 
         <div className="sidebar-footer">
@@ -418,6 +409,14 @@ export default function App({ session }) {
             </span>
             <span className="user-role">Dueño de Criollo</span>
           </div>
+          <button
+            className="signout-btn"
+            onClick={() => setActiveTab('integraciones')}
+            title="Integraciones"
+            style={{ color: activeTab === 'integraciones' ? 'var(--accent-terracotta)' : undefined }}
+          >
+            <Settings size={16} />
+          </button>
           <button
             className="signout-btn"
             onClick={() => supabase.auth.signOut()}
