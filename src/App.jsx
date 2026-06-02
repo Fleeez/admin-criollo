@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, MessageSquare, Calendar, Settings, AlertCircle, LogOut, Users, Moon, Sun } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Calendar, Settings, AlertCircle, LogOut, Users, Moon, Sun, Bot } from 'lucide-react';
 import { loadData, saveData, STORAGE_KEYS } from './mockData';
 import { supabase } from './lib/supabaseClient';
 import DashboardTab from './components/DashboardTab';
@@ -8,6 +8,7 @@ import CalendarTab from './components/CalendarTab';
 import IntegrationsTab from './components/IntegrationsTab';
 import InversoresTab from './components/InversoresTab';
 import ChatDrawer from './components/ChatDrawer';
+import ConfiguracionBotTab from './components/ConfiguracionBotTab';
 
 function mapReserva(r) {
   const e = (r.estado ?? '').toLowerCase();
@@ -243,6 +244,8 @@ export default function App({ session }) {
             addToast={addToast}
           />
         );
+      case 'configuracion-bot':
+        return <ConfiguracionBotTab addToast={addToast} />;
       case 'integraciones':
         return (
           <IntegrationsTab
@@ -263,6 +266,7 @@ export default function App({ session }) {
       case 'dashboard': return 'Dashboard';
       case 'conversaciones': return 'Supervisor de Conversaciones';
       case 'reservas': return 'Reservas';
+      case 'configuracion-bot': return 'Panel de Administración';
       case 'integraciones': return 'Integraciones de APIs';
       case 'inversores': return 'Leads de Inversores';
       default: return 'Gestión';
@@ -319,6 +323,16 @@ export default function App({ session }) {
             >
               <Users className="nav-icon" />
               <span>Inversores</span>
+            </button>
+          </li>
+
+          <li className="nav-item">
+            <button
+              className={`nav-link ${activeTab === 'configuracion-bot' ? 'active' : ''}`}
+              onClick={() => setActiveTab('configuracion-bot')}
+            >
+              <Bot className="nav-icon" />
+              <span>Panel Admin</span>
             </button>
           </li>
 
