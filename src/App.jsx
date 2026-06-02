@@ -199,9 +199,9 @@ export default function App({ session }) {
             onSendMessage={handleSendMessage}
           />
         );
-      case 'citas':
+      case 'reservas':
         return (
-          <CalendarTab 
+          <CalendarTab
             appointments={appointments}
             onSelectConversation={handleSelectConversation}
             addToast={addToast}
@@ -226,7 +226,7 @@ export default function App({ session }) {
     switch (activeTab) {
       case 'dashboard': return 'Dashboard';
       case 'conversaciones': return 'Supervisor de Conversaciones';
-      case 'citas': return 'Reservas & Citas';
+      case 'reservas': return 'Reservas';
       case 'integraciones': return 'Integraciones de APIs';
       case 'inversores': return 'Leads de Inversores';
       default: return 'Gestión';
@@ -267,22 +267,12 @@ export default function App({ session }) {
           </li>
 
           <li className="nav-item">
-            <button 
-              className={`nav-link ${activeTab === 'citas' ? 'active' : ''}`}
-              onClick={() => setActiveTab('citas')}
+            <button
+              className={`nav-link ${activeTab === 'reservas' ? 'active' : ''}`}
+              onClick={() => setActiveTab('reservas')}
             >
               <Calendar className="nav-icon" />
-              <span>Citas</span>
-            </button>
-          </li>
-
-          <li className="nav-item">
-            <button
-              className={`nav-link ${activeTab === 'integraciones' ? 'active' : ''}`}
-              onClick={() => setActiveTab('integraciones')}
-            >
-              <Settings className="nav-icon" />
-              <span>Integraciones</span>
+              <span>Reservas</span>
             </button>
           </li>
 
@@ -293,6 +283,16 @@ export default function App({ session }) {
             >
               <Users className="nav-icon" />
               <span>Inversores</span>
+            </button>
+          </li>
+
+          <li className="nav-item">
+            <button
+              className={`nav-link ${activeTab === 'integraciones' ? 'active' : ''}`}
+              onClick={() => setActiveTab('integraciones')}
+            >
+              <Settings className="nav-icon" />
+              <span>Integraciones</span>
             </button>
           </li>
         </ul>

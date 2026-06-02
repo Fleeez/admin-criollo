@@ -1584,3 +1584,68 @@ input:checked + .slider:before {
   color: var(--accent-terracotta);
   background-color: rgba(192, 92, 62, 0.08);
 }
+
+/* ─── Dashboard: bar chart ───────────────────────────────────── */
+.chart-outer {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  height: 130px;
+  padding: 8px 4px 0;
+}
+
+.chart-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  height: 100%;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.chart-bar {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  min-height: 4px;
+  transition: height 0.3s ease;
+}
+
+.chart-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+  min-height: 14px;
+}
+
+.chart-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+/* ─── Dashboard: bottom two-column grid ─────────────────────── */
+.dashboard-bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+@media (max-width: 960px) {
+  .dashboard-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Empty state inline ─────────────────────────────────────── */
+.empty-state-inline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 32px 16px;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  text-align: center;
+}
