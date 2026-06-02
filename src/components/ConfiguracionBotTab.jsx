@@ -43,7 +43,9 @@ export default function ConfiguracionBotTab({ addToast }) {
           setPlatoEstrella(data.plato_estrella     ?? '');
           setUrlPdfMenu(data.url_pdf_menu          ?? '');
           setPreciosTexto(data.precios_texto       ?? '');
-          setListaBlancaVip(data.lista_blanca_vip  ?? '');
+          // lista_blanca_vip puede ser TEXT[] (array) o TEXT según el esquema — normalizar siempre a string
+          const rawVip = data.lista_blanca_vip;
+          setListaBlancaVip(Array.isArray(rawVip) ? rawVip.join('\n') : (rawVip ?? ''));
         }
       } catch (err) {
         if (mounted) setLoadError(err.message || 'Error desconocido');
@@ -70,7 +72,9 @@ export default function ConfiguracionBotTab({ addToast }) {
             plato_estrella:   platoEstrella.trim()   || null,
             url_pdf_menu:     urlPdfMenu.trim()       || null,
             precios_texto:    preciosTexto.trim()     || null,
-            lista_blanca_vip: listaBlancaVip.trim()   || null,
+            lista_blanca_vip: listaBlancaVip.trim()
+              ? listaBlancaVip.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+              : [],
           },
           { onConflict: 'franquicia_id' }
         );

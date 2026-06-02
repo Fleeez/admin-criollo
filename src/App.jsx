@@ -9,6 +9,7 @@ import IntegrationsTab from './components/IntegrationsTab';
 import InversoresTab from './components/InversoresTab';
 import ChatDrawer from './components/ChatDrawer';
 import ConfiguracionBotTab from './components/ConfiguracionBotTab';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function mapReserva(r) {
   const e = (r.estado ?? '').toLowerCase();
@@ -450,7 +451,9 @@ export default function App({ session }) {
         </header>
 
         <div className="view-container">
-          {renderTabContent()}
+          <ErrorBoundary resetKey={activeTab}>
+            {renderTabContent()}
+          </ErrorBoundary>
         </div>
       </main>
 
