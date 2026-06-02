@@ -316,12 +316,24 @@ export default function App({ session }) {
     <div className="app-container" data-theme={darkMode ? 'dark' : 'light'}>
       {/* Sidebar Navigation */}
       <aside className="sidebar">
-        <div className="logo-section">
-          <div className="logo-icon">C</div>
-          <div className="logo-text">
-            <span className="logo-title">Criollo</span>
-            <span className="logo-subtitle">Gestión</span>
+        <div className="logo-section" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 0 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>
+            Est. 2024
+          </span>
+          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 900, letterSpacing: '0.1em', color: 'var(--text-primary)', lineHeight: 1, textTransform: 'uppercase' }}>
+            Criollo
+          </span>
+          <div style={{ display: 'flex', gap: 5, margin: '6px 0 5px' }}>
+            <span style={{ display: 'block', width: 18, height: 2, background: 'var(--accent-terracotta)', borderRadius: 2 }} />
+            <span style={{ display: 'block', width: 18, height: 2, background: 'var(--accent-terracotta)', borderRadius: 2 }} />
+            <span style={{ display: 'block', width: 18, height: 2, background: 'var(--accent-terracotta)', borderRadius: 2 }} />
           </div>
+          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.22em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+            Paladar Argento
+          </span>
+          <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.18em', color: 'var(--accent-terracotta)', textTransform: 'uppercase', marginTop: 8, paddingTop: 7, borderTop: '1px solid var(--border-color)', width: '100%' }}>
+            Gestión
+          </span>
         </div>
 
         <ul className="nav-menu">
