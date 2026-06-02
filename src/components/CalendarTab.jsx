@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, X, ExternalLink, Calendar, Table2, UserX, Gift } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, ExternalLink, Calendar, Table2, UserX, Gift, Send, MessageSquare } from 'lucide-react';
 
 const INACTIVE_DAYS = 25;
 
@@ -8,6 +8,12 @@ const monthNames = [
   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'
 ];
 const daysOfWeek = ['L','M','X','J','V','S','D'];
+
+const DEMO_INACTIVE = [
+  { name: 'Lucía Gómez',      phone: '+54 9 11 5555-1234', lastDate: '2026-03-15', daysAgo: 79 },
+  { name: 'Roberto Ferreyra', phone: '+54 9 351 777-8888', lastDate: '2026-04-02', daysAgo: 61 },
+  { name: 'Ana Florencia',    phone: '+54 9 11 9999-0000', lastDate: '2026-01-28', daysAgo: 125 },
+];
 
 function StatusBadge({ status }) {
   if (status === 'completada')
@@ -26,46 +32,111 @@ function getDaysInMonth(month, year) {
   const adjustedFirstDay = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
   const numDays = new Date(year, month + 1, 0).getDate();
   const days = [];
-
   const prevMonthDays = new Date(year, month, 0).getDate();
   for (let i = adjustedFirstDay - 1; i >= 0; i--) {
     const prevDate = prevMonthDays - i;
-    days.push({
-      day: prevDate,
-      isCurrentMonth: false,
-      dateStr: `${year}-${String(month).padStart(2,'0')}-${String(prevDate).padStart(2,'0')}`,
-    });
+    days.push({ day: prevDate, isCurrentMonth: false, dateStr: `${year}-${String(month).padStart(2,'0')}-${String(prevDate).padStart(2,'0')}` });
   }
   for (let i = 1; i <= numDays; i++) {
-    days.push({
-      day: i,
-      isCurrentMonth: true,
-      dateStr: `${year}-${String(month + 1).padStart(2,'0')}-${String(i).padStart(2,'0')}`,
-    });
+    days.push({ day: i, isCurrentMonth: true, dateStr: `${year}-${String(month + 1).padStart(2,'0')}-${String(i).padStart(2,'0')}` });
   }
   const totalCells = days.length <= 35 ? 35 : 42;
   for (let i = 1; i <= totalCells - days.length; i++) {
-    days.push({
-      day: i,
-      isCurrentMonth: false,
-      dateStr: `${year}-${String(month + 2).padStart(2,'0')}-${String(i).padStart(2,'0')}`,
-    });
+    days.push({ day: i, isCurrentMonth: false, dateStr: `${year}-${String(month + 2).padStart(2,'0')}-${String(i).padStart(2,'0')}` });
   }
   return days;
+}
+
+// ─── Discount Modal ───────────────────────────────────────────
+function DiscountModal({ clients, singleClient, onClose, addToast }) {
+  const [descuento, setDescuento] = useState('15');
+  const [vencimiento, setVencimiento] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    return d.toISOString().split('T')[0];
+  });
+
+  const preview = (name) =>
+    `Hola ${name}! 🥩 Te esperamos de vuelta en Criollo con un ${descuento}% OFF en tu próxima reserva. Válido hasta el ${vencimiento.split('-').reverse().join('/')}. ¡Reservá por este mismo chat!`;
+
+  const handleSend = (client) => {
+    addToast(`✓ Plantilla enviada a ${client.name} (${client.phone})`);
+    onClose();
+  };
+  const handleSendAll = () => {
+    addToast(`✓ Plantilla enviada a ${clients.length} cliente${clients.length !== 1 ? 's' : ''} inactivos`);
+    onClose();
+  };
+
+  const displayClient = singleClient || (clients.length === 1 ? clients[0] : null);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Gift size={18} /> Plantilla de descuento
+          </h3>
+          <button className="btn-close" onClick={onClose}><X size={20} /></button>
+        </div>
+        <div className="modal-body">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+            <div>
+              <label className="form-label" style={{ fontSize: 11, marginBottom: 4, display: 'block' }}>Descuento (%)</label>
+              <input
+                type="number" min="5" max="50" step="5"
+                className="form-input"
+                value={descuento}
+                onChange={e => setDescuento(e.target.value)}
+                style={{ padding: '8px 10px', fontSize: 14 }}
+              />
+            </div>
+            <div>
+              <label className="form-label" style={{ fontSize: 11, marginBottom: 4, display: 'block' }}>Válido hasta</label>
+              <input
+                type="date"
+                className="form-input"
+                value={vencimiento}
+                onChange={e => setVencimiento(e.target.value)}
+                style={{ padding: '8px 10px', fontSize: 14 }}
+              />
+            </div>
+          </div>
+
+          <div style={{ background: 'rgba(37,211,102,0.08)', border: '1px solid rgba(37,211,102,0.25)', borderRadius: 10, padding: '12px 14px', marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, color: '#25D166', fontWeight: 700, fontSize: 12 }}>
+              <MessageSquare size={13} /> Vista previa WhatsApp
+            </div>
+            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: 'var(--text-primary)' }}>
+              {preview(displayClient?.name || (clients.length > 1 ? '{nombre}' : '...'))}
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            {displayClient ? (
+              <button className="btn-primary" style={{ flex: 1 }} onClick={() => handleSend(displayClient)}>
+                <Send size={14} /> Enviar a {displayClient.name}
+              </button>
+            ) : null}
+            {clients.length > 1 && (
+              <button
+                className="btn-primary"
+                style={{ flex: 1, background: 'var(--accent-olive)', borderColor: 'var(--accent-olive)' }}
+                onClick={handleSendAll}
+              >
+                <Send size={14} /> Enviar a todos ({clients.length})
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ─── Calendario View ──────────────────────────────────────────
 function CalendarioView({ appointments, currentMonth, currentYear, setCurrentMonth, setCurrentYear, onSelectApt, onMoveAppointment, addToast }) {
   const [dragOverDate, setDragOverDate] = useState(null);
-
-  const handlePrevMonth = () => {
-    if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(y => y - 1); }
-    else setCurrentMonth(m => m - 1);
-  };
-  const handleNextMonth = () => {
-    if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear(y => y + 1); }
-    else setCurrentMonth(m => m + 1);
-  };
 
   const calendarDays = getDaysInMonth(currentMonth, currentYear);
   const today = new Date().toISOString().split('T')[0];
@@ -85,9 +156,17 @@ function CalendarioView({ appointments, currentMonth, currentYear, setCurrentMon
           >
             Sincronizar Google Calendar
           </button>
-          <button className="btn-today" onClick={() => { const d = new Date(); setCurrentMonth(d.getMonth()); setCurrentYear(d.getFullYear()); }}>Hoy</button>
-          <button className="btn-icon-nav" onClick={handlePrevMonth}><ChevronLeft size={16} /></button>
-          <button className="btn-icon-nav" onClick={handleNextMonth}><ChevronRight size={16} /></button>
+          <button className="btn-today" onClick={() => { const d = new Date(); setCurrentMonth(d.getMonth()); setCurrentYear(d.getFullYear()); }}>
+            Hoy
+          </button>
+          <button className="btn-icon-nav" onClick={() => {
+            if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(y => y - 1); }
+            else setCurrentMonth(m => m - 1);
+          }}><ChevronLeft size={16} /></button>
+          <button className="btn-icon-nav" onClick={() => {
+            if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear(y => y + 1); }
+            else setCurrentMonth(m => m + 1);
+          }}><ChevronRight size={16} /></button>
         </div>
       </div>
 
@@ -164,6 +243,7 @@ function TablaView({ appointments, onSelectApt }) {
               <th>Nombre</th>
               <th>Teléfono</th>
               <th>Personas</th>
+              <th>Ubicación</th>
               <th>Estado</th>
               <th></th>
             </tr>
@@ -181,6 +261,15 @@ function TablaView({ appointments, onSelectApt }) {
                 </td>
                 <td style={{ color: 'var(--text-secondary)' }}>{apt.phone}</td>
                 <td>{apt.guests}</td>
+                <td>
+                  <span style={{
+                    fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+                    background: apt.salon_exterior === 'Exterior' ? 'rgba(46,125,50,0.12)' : 'rgba(79,109,122,0.12)',
+                    color: apt.salon_exterior === 'Exterior' ? '#2E7D32' : '#3E5661',
+                  }}>
+                    {apt.salon_exterior || 'Salón'}
+                  </span>
+                </td>
                 <td><StatusBadge status={apt.status} /></td>
                 <td>
                   <button className="btn-link" style={{ fontSize: 13 }} onClick={() => onSelectApt(apt)}>Ver</button>
@@ -196,8 +285,9 @@ function TablaView({ appointments, onSelectApt }) {
 
 // ─── Inactivos View ───────────────────────────────────────────
 function InactivosView({ appointments, addToast }) {
-  const cutoff = new Date(Date.now() - INACTIVE_DAYS * 24 * 60 * 60 * 1000);
+  const [discountModal, setDiscountModal] = useState(null);
 
+  const cutoff = new Date(Date.now() - INACTIVE_DAYS * 24 * 60 * 60 * 1000);
   const byKey = {};
   appointments.forEach(a => {
     const key = a.phone || a.name;
@@ -206,27 +296,62 @@ function InactivosView({ appointments, addToast }) {
       byKey[key] = { name: a.name, phone: a.phone || '—', lastDate: a.date };
     }
   });
-
   const inactive = Object.values(byKey)
     .filter(p => new Date(p.lastDate) < cutoff)
     .sort((a, b) => a.lastDate.localeCompare(b.lastDate));
 
-  const daysAgo = dateStr => Math.floor((Date.now() - new Date(dateStr).getTime()) / (24 * 60 * 60 * 1000));
+  const calcDaysAgo = dateStr => Math.floor((Date.now() - new Date(dateStr).getTime()) / (24 * 60 * 60 * 1000));
+  const displayRows = inactive.length > 0 ? inactive : null;
 
-  if (inactive.length === 0) {
+  const InactiveRow = ({ p, isDemo }) => {
+    const days = isDemo ? p.daysAgo : calcDaysAgo(p.lastDate);
     return (
-      <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-tertiary)' }}>
-        <UserX size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-        <p>No hay clientes inactivos por más de {INACTIVE_DAYS} días.</p>
-      </div>
+      <tr>
+        <td>
+          <div className="user-cell">
+            <div className="user-cell-avatar">{p.name.charAt(0)}</div>
+            <span style={{ fontWeight: 600 }}>{p.name}</span>
+          </div>
+        </td>
+        <td style={{ color: 'var(--text-secondary)' }}>{p.phone}</td>
+        <td>{(isDemo ? p.lastDate : p.lastDate).split('-').reverse().join('/')}</td>
+        <td>
+          <span style={{ fontWeight: 700, color: days > 60 ? 'var(--accent-terracotta)' : 'var(--text-primary)' }}>
+            {days} días
+          </span>
+        </td>
+        <td>
+          <button
+            className="btn-primary"
+            style={{ fontSize: 12, padding: '5px 12px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+            onClick={() => !isDemo && setDiscountModal({ client: p, all: false })}
+          >
+            <Gift size={12} /> Descuento
+          </button>
+        </td>
+      </tr>
     );
-  }
+  };
 
   return (
     <div>
-      <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: '8px 0 16px' }}>
-        {inactive.length} cliente{inactive.length !== 1 ? 's' : ''} sin reservar en los últimos {INACTIVE_DAYS} días.
-      </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '8px 0 16px' }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: 0 }}>
+          {inactive.length > 0
+            ? `${inactive.length} cliente${inactive.length !== 1 ? 's' : ''} sin reservar en los últimos ${INACTIVE_DAYS} días.`
+            : `No hay clientes inactivos por más de ${INACTIVE_DAYS} días en tu base de datos.`}
+        </p>
+        {inactive.length > 1 && (
+          <button
+            className="btn-primary"
+            style={{ fontSize: 13, padding: '7px 16px', display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
+            onClick={() => setDiscountModal({ client: null, all: true })}
+          >
+            <Send size={13} /> Enviar a todos ({inactive.length})
+          </button>
+        )}
+      </div>
+
       <div className="data-table-wrapper">
         <table className="data-table">
           <thead>
@@ -239,35 +364,27 @@ function InactivosView({ appointments, addToast }) {
             </tr>
           </thead>
           <tbody>
-            {inactive.map((p, i) => (
-              <tr key={i}>
-                <td>
-                  <div className="user-cell">
-                    <div className="user-cell-avatar">{p.name.charAt(0)}</div>
-                    <span style={{ fontWeight: 600 }}>{p.name}</span>
-                  </div>
-                </td>
-                <td style={{ color: 'var(--text-secondary)' }}>{p.phone}</td>
-                <td>{p.lastDate.split('-').reverse().join('/')}</td>
-                <td>
-                  <span style={{ fontWeight: 700, color: daysAgo(p.lastDate) > 60 ? 'var(--accent-terracotta)' : 'var(--text-primary)' }}>
-                    {daysAgo(p.lastDate)} días
-                  </span>
-                </td>
-                <td>
-                  <button
-                    className="btn-link"
-                    style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}
-                    onClick={() => addToast(`Descuento enviado a ${p.name} — ${p.phone}`)}
-                  >
-                    <Gift size={13} /> Enviar descuento
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {displayRows
+              ? displayRows.map((p, i) => <InactiveRow key={i} p={p} isDemo={false} />)
+              : DEMO_INACTIVE.map((p, i) => <InactiveRow key={i} p={p} isDemo={true} />)
+            }
           </tbody>
         </table>
+        {!displayRows && (
+          <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-tertiary)', marginTop: 8, fontStyle: 'italic' }}>
+            Ejemplo — cuando haya clientes inactivos aparecerán aquí automáticamente
+          </p>
+        )}
       </div>
+
+      {discountModal && (
+        <DiscountModal
+          clients={discountModal.all ? inactive : (discountModal.client ? [discountModal.client] : inactive)}
+          singleClient={discountModal.all ? null : discountModal.client}
+          onClose={() => setDiscountModal(null)}
+          addToast={addToast}
+        />
+      )}
     </div>
   );
 }
@@ -285,11 +402,8 @@ export default function CalendarTab({ appointments, onSelectConversation, onMove
     { id: 'inactivos',  label: 'Inactivos',   icon: <UserX size={14} /> },
   ];
 
-  const baseBtn = {
-    borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 600,
-    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-  };
-  const activeBtn  = { ...baseBtn, background: 'var(--accent-olive)', color: '#fff', border: '1px solid var(--accent-olive)' };
+  const baseBtn = { borderRadius: 8, padding: '6px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 };
+  const activeBtn   = { ...baseBtn, background: 'var(--accent-olive)', color: '#fff', border: '1px solid var(--accent-olive)', fontWeight: 600 };
   const inactiveBtn = { ...baseBtn, background: 'none', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', fontWeight: 500 };
 
   return (
@@ -314,9 +428,10 @@ export default function CalendarTab({ appointments, onSelectConversation, onMove
           addToast={addToast}
         />
       )}
-      {activeView === 'tabla' && <TablaView appointments={appointments} onSelectApt={setSelectedApt} />}
-      {activeView === 'inactivos' && <InactivosView appointments={appointments} addToast={addToast} />}
+      {activeView === 'tabla'      && <TablaView appointments={appointments} onSelectApt={setSelectedApt} />}
+      {activeView === 'inactivos'  && <InactivosView appointments={appointments} addToast={addToast} />}
 
+      {/* Appointment detail modal */}
       {selectedApt && (
         <div className="modal-overlay" onClick={() => setSelectedApt(null)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -332,6 +447,15 @@ export default function CalendarTab({ appointments, onSelectConversation, onMove
                 <span className="detail-value">{selectedApt.date.split('-').reverse().join('/')} — {selectedApt.time} hs</span>
               </div>
               <div className="detail-row"><span className="detail-label">Comensales</span><span className="detail-value">{selectedApt.guests} personas</span></div>
+              <div className="detail-row">
+                <span className="detail-label">Ubicación</span>
+                <span className="detail-value" style={{
+                  color: selectedApt.salon_exterior === 'Exterior' ? '#2E7D32' : 'var(--accent-olive)',
+                  fontWeight: 600,
+                }}>
+                  {selectedApt.salon_exterior || 'Salón'}
+                </span>
+              </div>
               <div className="detail-row"><span className="detail-label">Estado</span><span className="detail-value"><StatusBadge status={selectedApt.status} /></span></div>
               <button
                 className="btn-primary"

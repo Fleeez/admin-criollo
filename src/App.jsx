@@ -21,6 +21,7 @@ function mapReserva(r) {
     time: r.hora,
     guests: r.personas,
     status,
+    salon_exterior: r.salon_exterior || 'Salón',
   };
 }
 
@@ -182,10 +183,24 @@ export default function App({ session }) {
 
   // Move appointment to a new date (drag & drop in CalendarTab)
   const handleMoveAppointment = async (aptId, newDate) => {
+    const apt = appointments.find(a => a.id === aptId);
+    if (!apt) return;
+    const hora = apt.time || '00:00';
+    const fechaIso = `${newDate}T${hora}:00`;
+
+    // Optimistic update
     setAppointments(prev => prev.map(a => a.id === aptId ? { ...a, date: newDate } : a));
-    try {
-      await supabase.from('reservas').update({ fecha: newDate }).eq('id', aptId);
-    } catch (_) { /* Realtime subscription will sync regardless */ }
+
+    const { error } = await supabase
+      .from('reservas')
+      .update({ fecha: newDate, fecha_iso: fechaIso })
+      .eq('id', aptId);
+
+    if (error) {
+      addToast('⚠️ No se pudo guardar. Ejecutá el SQL de permisos en Supabase.');
+      // Revert on failure
+      setAppointments(prev => prev.map(a => a.id === aptId ? { ...a, date: apt.date } : a));
+    }
   };
 
   // Save integrations

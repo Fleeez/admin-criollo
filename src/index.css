@@ -1695,6 +1695,41 @@ input:checked + .slider:before {
 [data-theme="dark"] .nav-link:hover { background: rgba(255,255,255,0.05); }
 [data-theme="dark"] .nav-link.active { background: rgba(192,92,62,0.2); }
 
+/* Calendar controls */
+[data-theme="dark"] .btn-today {
+  color: var(--text-primary);
+  background: #2A2420;
+  border-color: #3A3430;
+}
+[data-theme="dark"] .btn-today:hover { background: #332E2A; }
+[data-theme="dark"] .btn-icon-nav { background: #2A2420; border-color: #3A3430; }
+[data-theme="dark"] .btn-icon-nav:hover { background: #332E2A; }
+
+/* Outside-month cells */
+[data-theme="dark"] .calendar-cell.outside-month { background: rgba(255,255,255,0.015); }
+[data-theme="dark"] .calendar-cell.outside-month .cell-number { color: #4A4440; }
+
+/* Badges in dark mode */
+[data-theme="dark"] .badge.badge-bot {
+  background: rgba(79,109,122,0.3);
+  color: #90BFB4;
+}
+[data-theme="dark"] .badge.badge-manual {
+  background: rgba(216,67,21,0.25);
+  color: #FF8B6E;
+}
+
+/* View-toggle buttons in dark */
+[data-theme="dark"] .view-container { color: var(--text-primary); }
+
+/* Detail modal rows */
+[data-theme="dark"] .detail-label { color: var(--text-tertiary); }
+[data-theme="dark"] .detail-value { color: var(--text-primary); }
+[data-theme="dark"] .detail-row { border-color: #3A3430; }
+
+/* Modal overlay backdrop darker */
+[data-theme="dark"] .modal-overlay { background: rgba(0,0,0,0.75); }
+
 /* ─── Empty state inline ─────────────────────────────────────── */
 .empty-state-inline {
   display: flex;
