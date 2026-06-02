@@ -9,11 +9,6 @@ const monthNames = [
 ];
 const daysOfWeek = ['L','M','X','J','V','S','D'];
 
-const DEMO_INACTIVE = [
-  { name: 'Lucía Gómez',      phone: '+54 9 11 5555-1234', lastDate: '2026-03-15', daysAgo: 79 },
-  { name: 'Roberto Ferreyra', phone: '+54 9 351 777-8888', lastDate: '2026-04-02', daysAgo: 61 },
-  { name: 'Ana Florencia',    phone: '+54 9 11 9999-0000', lastDate: '2026-01-28', daysAgo: 125 },
-];
 
 function StatusBadge({ status }) {
   if (status === 'completada')
@@ -61,12 +56,12 @@ function DiscountModal({ clients, singleClient, onClose, addToast }) {
   const preview = (name) =>
     `Hola ${name}! 🥩 Te esperamos de vuelta en Criollo con un ${descuento}% OFF en tu próxima reserva. Válido hasta el ${vencimiento.split('-').reverse().join('/')}. ¡Reservá por este mismo chat!`;
 
-  const handleSend = (client) => {
-    addToast(`✓ Plantilla enviada a ${client.name} (${client.phone})`);
+  const handleSend = () => {
+    addToast('WhatsApp aún no configurado. Configurá Evolution API en Integraciones para enviar mensajes.');
     onClose();
   };
   const handleSendAll = () => {
-    addToast(`✓ Plantilla enviada a ${clients.length} cliente${clients.length !== 1 ? 's' : ''} inactivos`);
+    addToast('WhatsApp aún no configurado. Configurá Evolution API en Integraciones para enviar mensajes.');
     onClose();
   };
 
@@ -244,7 +239,7 @@ function CalendarioView({ appointments, currentMonth, currentYear, setCurrentMon
         <div className="calendar-controls">
           <button
             className="btn-today"
-            onClick={() => addToast('Sincronizando con Google Calendar API...')}
+            onClick={() => addToast('Google Calendar aún no está configurado. Próximamente disponible.')}
             style={{ marginRight: 8, backgroundColor: 'var(--accent-olive)', color: 'white', borderColor: 'var(--accent-olive)' }}
           >
             Sincronizar Google Calendar
@@ -493,15 +488,16 @@ function InactivosView({ appointments, addToast }) {
           <tbody>
             {displayRows
               ? displayRows.map((p, i) => renderRow(p, false, i))
-              : DEMO_INACTIVE.map((p, i) => renderRow(p, true, i))
+              : (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+                    Sin clientes inactivos — todos han reservado en los últimos {INACTIVE_DAYS} días
+                  </td>
+                </tr>
+              )
             }
           </tbody>
         </table>
-        {!displayRows && (
-          <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-tertiary)', marginTop: 8, fontStyle: 'italic' }}>
-            Ejemplo — cuando haya clientes inactivos aparecerán aquí automáticamente
-          </p>
-        )}
       </div>
 
       {discountModal && (

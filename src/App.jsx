@@ -34,7 +34,6 @@ export default function App({ session }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [conversations, setConversations] = useState([]);
   const [appointments, setAppointments] = useState([]);
-  const [integrations, setIntegrations] = useState({});
   const [selectedConvId, setSelectedConvId] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('criollo_dark') === '1');
@@ -54,11 +53,10 @@ export default function App({ session }) {
     });
   };
 
-  // Load conversations & integrations from localStorage, appointments from Supabase
+  // Load conversations from localStorage (demo data), appointments from Supabase
   useEffect(() => {
     const data = loadData();
     setConversations(data.conversations);
-    setIntegrations(data.integrations);
     if (data.conversations.length > 0) {
       setSelectedConvId(data.conversations[0].id);
     }
@@ -252,12 +250,6 @@ export default function App({ session }) {
     }
   };
 
-  // Save integrations
-  const handleSaveIntegrations = (newIntegrations) => {
-    setIntegrations(newIntegrations);
-    saveData(STORAGE_KEYS.INTEGRATIONS, newIntegrations);
-  };
-
   // Render correct tab view
   const renderTabContent = () => {
     switch (activeTab) {
@@ -295,13 +287,7 @@ export default function App({ session }) {
       case 'configuracion-bot':
         return <ConfiguracionBotTab addToast={addToast} />;
       case 'integraciones':
-        return (
-          <IntegrationsTab
-            integrations={integrations}
-            onSaveIntegrations={handleSaveIntegrations}
-            addToast={addToast}
-          />
-        );
+        return <IntegrationsTab addToast={addToast} />;
       case 'inversores':
         return <InversoresTab addToast={addToast} />;
       default:

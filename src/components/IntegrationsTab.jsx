@@ -1,185 +1,224 @@
-import React, { useState } from 'react';
-import { Save, Copy, Check, Info, Server, Calendar, MessageCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Save, Copy, Check, Info, Server, Calendar, MessageCircle, Loader } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
 
-export default function IntegrationsTab({ integrations, onSaveIntegrations, addToast }) {
-  const [formData, setFormData] = useState({ ...integrations });
-  const [copiedField, setCopiedField] = useState(null);
+const FRANQUICIA_ID = '1';
+
+export default function IntegrationsTab({ addToast }) {
+  const [formData, setFormData] = useState({
+    evolution_api_url:         '',
+    evolution_api_key:         '',
+    evolution_instance:        '',
+    webhook_verify_token:      '',
+    google_calendar_client_id: '',
+  });
+  const [copiedField,   setCopiedField]   = useState(null);
+  const [isLoading,     setIsLoading]     = useState(false);
+  const [isSaving,      setIsSaving]      = useState(false);
+  const [loadError,     setLoadError]     = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    setIsLoading(true);
+
+    supabase
+      .from('integraciones')
+      .select('*')
+      .eq('franquicia_id', FRANQUICIA_ID)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!mounted) return;
+        if (error) {
+          setLoadError(error.message);
+        } else if (data) {
+          setFormData({
+            evolution_api_url:         data.evolution_api_url         ?? '',
+            evolution_api_key:         data.evolution_api_key         ?? '',
+            evolution_instance:        data.evolution_instance        ?? '',
+            webhook_verify_token:      data.webhook_verify_token      ?? '',
+            google_calendar_client_id: data.google_calendar_client_id ?? '',
+          });
+        }
+        setIsLoading(false);
+      });
+
+    return () => { mounted = false; };
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    onSaveIntegrations(formData);
-    addToast('✓ Configuraciones guardadas y validadas con éxito');
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('integraciones')
+        .upsert(
+          {
+            franquicia_id:             FRANQUICIA_ID,
+            evolution_api_url:         formData.evolution_api_url.trim()         || null,
+            evolution_api_key:         formData.evolution_api_key.trim()         || null,
+            evolution_instance:        formData.evolution_instance.trim()        || null,
+            webhook_verify_token:      formData.webhook_verify_token.trim()      || null,
+            google_calendar_client_id: formData.google_calendar_client_id.trim() || null,
+            updated_at:                new Date().toISOString(),
+          },
+          { onConflict: 'franquicia_id' }
+        );
+      if (error) throw error;
+      addToast('✓ Configuración guardada en Supabase');
+    } catch (err) {
+      addToast('⚠️ Error al guardar: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCopy = (text, fieldName) => {
+    if (!text) return;
     navigator.clipboard.writeText(text);
     setCopiedField(fieldName);
     addToast(`Copiado: ${fieldName}`);
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const sqlSchema = `
--- TABLA DE CONVERSACIONES
-create table conversations (
-  id uuid default gen_random_uuid() primary key,
-  phone text unique not null,
-  name text,
-  bot_active boolean default true,
-  last_message text,
-  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
+  if (isLoading) {
+    return (
+      <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+        <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} />
+        Cargando configuración...
+      </div>
+    );
+  }
 
--- TABLA DE MENSAJES DE WHATSAPP
-create table messages (
-  id uuid default gen_random_uuid() primary key,
-  conversation_id uuid references conversations(id) on delete cascade,
-  sender text not null check (sender in ('client', 'ai', 'human')),
-  text text not null,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
--- TABLA DE RESERVAS (CITAS)
-create table appointments (
-  id uuid default gen_random_uuid() primary key,
-  name text not null,
-  phone text not null,
-  date date not null,
-  time time not null,
-  guests integer not null,
-  status text default 'pendiente' check (status in ('pendiente', 'completada', 'cancelada')),
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-  `.trim();
+  if (loadError) {
+    return (
+      <div style={{ padding: 40 }}>
+        <div style={{ background: 'rgba(216,67,21,0.1)', border: '1px solid rgba(216,67,21,0.3)', borderRadius: 12, padding: '24px 28px' }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--status-paused-text)', marginBottom: 8 }}>
+            ⚠️ No se pudo cargar la configuración
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>{loadError}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+            Si la tabla <code style={{ fontFamily: 'monospace', background: 'rgba(0,0,0,0.1)', padding: '1px 5px', borderRadius: 4 }}>integraciones</code> no existe, ejecutá la migración SQL v2 en el Editor SQL de Supabase.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="integrations-wrapper">
       <form onSubmit={handleSave}>
-        {/* WhatsApp Cloud API Section */}
+
+        {/* Evolution API (WhatsApp Gateway) */}
         <div className="form-section">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
             <MessageCircle size={24} color="var(--accent-terracotta)" />
-            <h3 className="form-section-title" style={{ marginBottom: 0 }}>WhatsApp Cloud API</h3>
+            <h3 className="form-section-title" style={{ marginBottom: 0 }}>Evolution API — Gateway de WhatsApp</h3>
           </div>
           <p className="form-section-desc">
-            Conecta tu número de WhatsApp Business gestionado en Meta para recibir y responder mensajes en tiempo real.
+            Bruno usa Evolution API para enviar y recibir mensajes de WhatsApp.
+            Estos datos también están en el <code style={{ fontFamily: 'monospace', fontSize: 12 }}>.env</code> del servidor.
+            Configurarlos aquí permite conectar el panel admin cuando se active el envío de mensajes.
           </p>
 
           <div className="input-grid">
             <div className="form-group">
-              <label className="form-label">Phone Number ID</label>
-              <input 
-                type="text" 
-                name="phoneId"
-                className="form-input" 
-                placeholder="Ej. 123456789012345" 
-                value={formData.phoneId}
+              <label className="form-label">URL de Evolution API</label>
+              <input
+                type="url"
+                name="evolution_api_url"
+                className="form-input"
+                placeholder="http://localhost:8080"
+                value={formData.evolution_api_url}
                 onChange={handleInputChange}
-                required
               />
             </div>
 
             <div className="form-group">
-              <label className="form-label">WABA ID (WhatsApp Business Account)</label>
-              <input 
-                type="text" 
-                name="wabaId"
-                className="form-input" 
-                placeholder="Ej. 987654321098765" 
-                value={formData.wabaId}
+              <label className="form-label">Instance Name</label>
+              <input
+                type="text"
+                name="evolution_instance"
+                className="form-input"
+                placeholder="bruno"
+                value={formData.evolution_instance}
                 onChange={handleInputChange}
-                required
               />
             </div>
           </div>
 
           <div className="form-group" style={{ marginBottom: '20px' }}>
-            <label className="form-label">Access Token (System User User Token, "Never expires")</label>
-            <input 
-              type="password" 
-              name="accessToken"
-              className="form-input" 
-              placeholder="EAAG..." 
-              value={formData.accessToken}
+            <label className="form-label">API Key</label>
+            <input
+              type="password"
+              name="evolution_api_key"
+              className="form-input"
+              placeholder="Tu API Key de Evolution"
+              value={formData.evolution_api_key}
               onChange={handleInputChange}
-              required
             />
           </div>
 
-          <div className="input-grid">
-            <div className="form-group">
-              <label className="form-label">App Secret</label>
-              <input 
-                type="password" 
-                name="appSecret"
-                className="form-input" 
-                placeholder="Tu App Secret de Meta" 
-                value={formData.appSecret}
-                onChange={handleInputChange}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Secreto del verify token</label>
-              <input 
-                type="text" 
-                name="verifyToken"
-                className="form-input" 
-                placeholder="Texto aleatorio para verificación del Webhook" 
-                value={formData.verifyToken}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-          </div>
-
-          <button type="submit" className="btn-primary">
-            <Save size={16} /> Guardar y validar credenciales
+          <button type="submit" className="btn-primary" disabled={isSaving} style={{ opacity: isSaving ? 0.7 : 1 }}>
+            <Save size={16} /> {isSaving ? 'Guardando...' : 'Guardar configuración'}
           </button>
         </div>
 
-        {/* Webhook Configuration Section */}
+        {/* Webhook Info */}
         <div className="form-section">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
             <Info size={22} color="var(--accent-olive)" />
-            <h3 className="form-section-title" style={{ marginBottom: 0 }}>Configuración de Webhook en Meta</h3>
+            <h3 className="form-section-title" style={{ marginBottom: 0 }}>Configuración de Webhook</h3>
           </div>
           <p className="form-section-desc">
-            Copia estos valores en la sección <b>Webhooks</b> de tu aplicación en Meta Developers. Suscríbete a los eventos <b>messages</b> y <b>message_deliveries</b>.
+            Configura estos valores en tu instancia de Evolution API o en Meta Developers.
           </p>
 
           <div className="webhook-info-panel">
             <div className="webhook-item">
               <div>
-                <span className="form-label" style={{ fontSize: '10px' }}>Callback URL</span>
-                <div className="webhook-value">https://admin-criollo.vercel.app/webhook</div>
+                <span className="form-label" style={{ fontSize: '10px' }}>Webhook URL del Bot</span>
+                <div className="webhook-value">
+                  {formData.evolution_api_url
+                    ? `${formData.evolution_api_url.replace(/\/$/, '')}/webhook`
+                    : 'Configurá la URL de Evolution API arriba'}
+                </div>
               </div>
-              <button
-                type="button"
-                className="btn-copy"
-                onClick={() => handleCopy('https://admin-criollo.vercel.app/webhook', 'Callback URL')}
-              >
-                {copiedField === 'Callback URL' ? <Check size={16} color="green" /> : <Copy size={16} />}
-              </button>
+              {formData.evolution_api_url && (
+                <button
+                  type="button"
+                  className="btn-copy"
+                  onClick={() => handleCopy(`${formData.evolution_api_url.replace(/\/$/, '')}/webhook`, 'Webhook URL')}
+                >
+                  {copiedField === 'Webhook URL' ? <Check size={16} color="green" /> : <Copy size={16} />}
+                </button>
+              )}
             </div>
 
             <div className="webhook-item">
               <div>
                 <span className="form-label" style={{ fontSize: '10px' }}>Verify Token</span>
-                <div className="webhook-value">{formData.verifyToken || 'Define un Verify Token arriba'}</div>
+                <input
+                  type="text"
+                  name="webhook_verify_token"
+                  className="form-input"
+                  placeholder="Token aleatorio para verificación del Webhook"
+                  value={formData.webhook_verify_token}
+                  onChange={handleInputChange}
+                  style={{ marginTop: 4, fontSize: 13 }}
+                />
               </div>
-              <button 
+              <button
                 type="button"
-                className="btn-copy" 
-                disabled={!formData.verifyToken}
-                onClick={() => handleCopy(formData.verifyToken, 'Verify Token')}
+                className="btn-copy"
+                disabled={!formData.webhook_verify_token}
+                style={{ marginTop: 22 }}
+                onClick={() => handleCopy(formData.webhook_verify_token, 'Verify Token')}
               >
                 {copiedField === 'Verify Token' ? <Check size={16} color="green" /> : <Copy size={16} />}
               </button>
@@ -187,86 +226,60 @@ create table appointments (
           </div>
         </div>
 
-        {/* Supabase Section — hidden: credentials managed server-side */}
-        {false && <div className="form-section" style={{display:'none'}}>
+        {/* Google Calendar */}
+        <div className="form-section">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+            <Calendar size={22} color="var(--accent-olive)" />
+            <h3 className="form-section-title" style={{ marginBottom: 0 }}>Google Calendar API</h3>
+          </div>
+          <p className="form-section-desc">
+            Próximamente: agendá reservas directamente en Google Calendar.
+            Ingresá tu Client ID de OAuth2 para activarlo cuando esté disponible.
+          </p>
+
+          <div className="form-group" style={{ marginBottom: '16px' }}>
+            <label className="form-label">Google API Client ID (OAuth2)</label>
+            <input
+              type="text"
+              name="google_calendar_client_id"
+              className="form-input"
+              placeholder="xxxx.apps.googleusercontent.com"
+              value={formData.google_calendar_client_id}
+              onChange={handleInputChange}
+            />
+          </div>
+
+          <button
+            type="button"
+            className="btn-primary"
+            style={{ backgroundColor: 'var(--accent-olive)', opacity: 0.6, cursor: 'not-allowed' }}
+            onClick={() => addToast('Google Calendar aún no está disponible. Guardá tu Client ID para cuando se active.')}
+            disabled
+          >
+            Vincular cuenta Google — Próximamente
+          </button>
+        </div>
+
+        {/* Supabase info */}
+        <div className="form-section">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
             <Server size={22} color="var(--accent-gold)" />
             <h3 className="form-section-title" style={{ marginBottom: 0 }}>Base de Datos Supabase</h3>
           </div>
           <p className="form-section-desc">
-            Sincroniza en tiempo real los mensajes recibidos e interacciones del chatbot con tu panel web.
+            Las credenciales de Supabase se configuran vía variables de entorno en Vercel (<code style={{ fontFamily: 'monospace', fontSize: 12 }}>VITE_SUPABASE_URL</code> y <code style={{ fontFamily: 'monospace', fontSize: 12 }}>VITE_SUPABASE_ANON_KEY</code>).
+            El panel ya está conectado.
           </p>
-
-          <div className="input-grid">
-            <div className="form-group">
-              <label className="form-label">Supabase URL del Proyecto</label>
-              <input 
-                type="url" 
-                name="supabaseUrl"
-                className="form-input" 
-                placeholder="https://xxxx.supabase.co" 
-                value={formData.supabaseUrl}
-                onChange={handleInputChange}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Supabase Public Anon Key</label>
-              <input 
-                type="password" 
-                name="supabaseAnonKey"
-                className="form-input" 
-                placeholder="eyJhbGciOi..." 
-                value={formData.supabaseAnonKey}
-                onChange={handleInputChange}
-              />
-            </div>
-          </div>
-
-          <div style={{ marginTop: '20px' }}>
-            <span className="form-label" style={{ display: 'block', marginBottom: '6px' }}>Esquema SQL Inicial Requerido</span>
-            <span className="form-section-desc" style={{ display: 'block', marginBottom: '10px' }}>
-              Ejecuta este código en el editor SQL de Supabase para inicializar las tablas necesarias de mensajería y reservas.
-            </span>
-            <div className="sql-script-box">
-              <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{sqlSchema}</pre>
-            </div>
-          </div>
-        </div>}
-
-        {/* Google Calendar Section */}
-        <div className="form-section">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-            <Calendar size={22} color="var(--accent-olive)" />
-            <h3 className="form-section-title" style={{ marginBottom: 0 }}>Integración Google Calendar API</h3>
-          </div>
-          <p className="form-section-desc">
-            Agenda de forma automática las reservas acordadas por Bruno en el calendario de tu restaurante.
-          </p>
-
-          <div className="form-group" style={{ marginBottom: '20px' }}>
-            <label className="form-label">Google API Client ID (OAuth2)</label>
-            <input 
-              type="text" 
-              name="calendarClientId"
-              className="form-input" 
-              placeholder="xxxx.apps.googleusercontent.com" 
-              value={formData.calendarClientId}
-              onChange={handleInputChange}
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <button 
-              type="button" 
-              className="btn-primary" 
-              style={{ backgroundColor: 'var(--accent-olive)' }}
-              onClick={() => addToast('Google OAuth2 popup simulado...')}
-            >
-              Vincular cuenta Google
-            </button>
+          <div style={{
+            background: 'rgba(67,160,71,0.08)', border: '1px solid rgba(67,160,71,0.25)',
+            borderRadius: 10, padding: '12px 16px', fontSize: 13, color: 'var(--text-secondary)',
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span style={{ color: '#2E7D32', fontWeight: 700 }}>●</span>
+            Conectado a Supabase correctamente
           </div>
         </div>
+
       </form>
     </div>
   );
