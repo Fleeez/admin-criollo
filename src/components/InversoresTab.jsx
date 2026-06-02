@@ -4,6 +4,7 @@ import {
   Table2, Calendar, LayoutGrid,
   ChevronDown, ChevronRight, ChevronLeft,
   Search, MessageCircle, TrendingUp,
+  Trash2, RotateCcw,
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
@@ -50,7 +51,7 @@ const INPUT_STYLE = {
   backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)',
   fontFamily: 'inherit', outline: 'none', transition: 'border-color 0.2s',
 };
-const READONLY_STYLE = { ...INPUT_STYLE, backgroundColor: '#F0EDE8', color: 'var(--text-secondary)', cursor: 'default' };
+const READONLY_STYLE = { ...INPUT_STYLE, backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', cursor: 'default' };
 const LABEL_STYLE = { fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '5px', display: 'block' };
 const SEC_TITLE   = { fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '14px', paddingBottom: '8px', borderBottom: '1px solid var(--border-color)' };
 const NAV_BTN     = { background: 'none', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' };
@@ -337,7 +338,7 @@ function CalendarioView({ leads, onSchedule, onOpenModal, addToast }) {
 
 // ── PipelineView ────────────────────────────────────────────
 
-function PipelineView({ leads, onMoveColumn, onOpenModal }) {
+function PipelineView({ leads, onMoveColumn, onOpenModal, onDeleteLead }) {
   const [dropCol,      setDropCol]      = useState(null);
   const [expandedCard, setExpandedCard] = useState(null);
 
@@ -428,6 +429,13 @@ function PipelineView({ leads, onMoveColumn, onOpenModal }) {
                               <ExternalLink size={11} /> PDF
                             </a>
                           )}
+                          <button
+                            onClick={e => { e.stopPropagation(); onDeleteLead(lead.id); }}
+                            className="btn-link"
+                            style={{ fontSize: '12px', color: 'var(--text-tertiary)', display: 'inline-flex', alignItems: 'center', gap: 3 }}
+                          >
+                            <Trash2 size={11} />
+                          </button>
                         </div>
                       </div>
                     )}
@@ -447,12 +455,168 @@ function PipelineView({ leads, onMoveColumn, onOpenModal }) {
   );
 }
 
+// ── PapeleraView ────────────────────────────────────────────
+
+const DIAS_EXPIRACION = 15;
+
+function PapeleraView({ onRestored, addToast }) {
+  const [deletedLeads, setDeletedLeads] = useState([]);
+  const [loading,      setLoading]      = useState(true);
+
+  useEffect(() => {
+    async function cargar() {
+      const { data } = await supabase
+        .from('inversores')
+        .select('*')
+        .not('deleted_at', 'is', null)
+        .order('deleted_at', { ascending: false });
+
+      const now = Date.now();
+      const activos  = [];
+      const expirados = [];
+      (data || []).forEach(l => {
+        const dias = (now - new Date(l.deleted_at)) / 86400000;
+        if (dias >= DIAS_EXPIRACION) expirados.push(l);
+        else activos.push(l);
+      });
+
+      if (expirados.length > 0) {
+        await Promise.all(expirados.map(l => supabase.from('inversores').delete().eq('id', l.id)));
+      }
+      setDeletedLeads(activos);
+      setLoading(false);
+    }
+    cargar();
+  }, []);
+
+  const diasRestantes = (deletedAt) =>
+    Math.max(0, Math.ceil(DIAS_EXPIRACION - (Date.now() - new Date(deletedAt)) / 86400000));
+
+  const handleRestore = async (lead) => {
+    const { error } = await supabase.from('inversores').update({ deleted_at: null }).eq('id', lead.id);
+    if (!error) {
+      setDeletedLeads(prev => prev.filter(l => l.id !== lead.id));
+      onRestored({ ...lead, deleted_at: null });
+      addToast('✓ Lead restaurado');
+    } else {
+      addToast('⚠️ Error al restaurar: ' + error.message);
+    }
+  };
+
+  const handlePermanentDelete = async (lead) => {
+    const { error } = await supabase.from('inversores').delete().eq('id', lead.id);
+    if (!error) {
+      setDeletedLeads(prev => prev.filter(l => l.id !== lead.id));
+      addToast('Lead eliminado definitivamente');
+    } else {
+      addToast('⚠️ Error: ' + error.message);
+    }
+  };
+
+  if (loading) return (
+    <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)' }}>Cargando papelera...</div>
+  );
+
+  return (
+    <div className="section-card">
+      <div className="section-header">
+        <h3 className="section-title">Papelera</h3>
+        <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+          {deletedLeads.length === 0
+            ? 'Vacía'
+            : `${deletedLeads.length} lead${deletedLeads.length !== 1 ? 's' : ''} — se eliminan definitivamente después de ${DIAS_EXPIRACION} días`}
+        </span>
+      </div>
+
+      {deletedLeads.length === 0 ? (
+        <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 14 }}>
+          <Trash2 size={32} style={{ opacity: 0.3, marginBottom: 12 }} />
+          <div>La papelera está vacía</div>
+        </div>
+      ) : (
+        <div className="data-table-wrapper">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Email</th>
+                <th>Eliminado</th>
+                <th>Expira en</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {deletedLeads.map(lead => {
+                const dias = diasRestantes(lead.deleted_at);
+                return (
+                  <tr key={lead.id}>
+                    <td>
+                      <div className="user-cell">
+                        <div className="user-cell-avatar" style={{ opacity: 0.5 }}>
+                          {(lead.nombre || lead.email || '?').charAt(0).toUpperCase()}
+                        </div>
+                        <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{lead.nombre || '—'}</span>
+                      </div>
+                    </td>
+                    <td style={{ color: 'var(--text-tertiary)' }}>{lead.email || '—'}</td>
+                    <td style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>
+                      {new Date(lead.deleted_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    </td>
+                    <td>
+                      <span style={{
+                        display: 'inline-block', padding: '3px 9px', borderRadius: 12, fontSize: 12, fontWeight: 700,
+                        background: dias <= 3 ? 'rgba(216,67,21,0.12)' : 'rgba(212,163,115,0.18)',
+                        color: dias <= 3 ? '#D84315' : '#8B6914',
+                      }}>
+                        {dias === 0 ? 'Expira hoy' : `${dias} día${dias !== 1 ? 's' : ''}`}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          onClick={() => handleRestore(lead)}
+                          title="Restaurar lead"
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 5,
+                            padding: '5px 10px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+                            background: 'rgba(46,125,50,0.1)', color: '#2E7D32',
+                            border: '1px solid rgba(46,125,50,0.2)', cursor: 'pointer', fontFamily: 'inherit',
+                          }}
+                        >
+                          <RotateCcw size={12} /> Restaurar
+                        </button>
+                        <button
+                          onClick={() => handlePermanentDelete(lead)}
+                          title="Eliminar definitivamente"
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 5,
+                            padding: '5px 10px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+                            background: 'rgba(216,67,21,0.08)', color: '#D84315',
+                            border: '1px solid rgba(216,67,21,0.2)', cursor: 'pointer', fontFamily: 'inherit',
+                          }}
+                        >
+                          <Trash2 size={12} /> Eliminar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── InversoresTab ───────────────────────────────────────────
 
 const VIEWS = [
-  { id: 'tabla',      label: 'Tabla',      Icon: Table2 },
-  { id: 'calendario', label: 'Calendario', Icon: Calendar },
+  { id: 'tabla',      label: 'Tabla',      Icon: Table2    },
+  { id: 'calendario', label: 'Calendario', Icon: Calendar  },
   { id: 'pipeline',   label: 'Pipeline',   Icon: LayoutGrid },
+  { id: 'papelera',   label: 'Papelera',   Icon: Trash2    },
 ];
 
 export default function InversoresTab({ addToast }) {
@@ -463,7 +627,7 @@ export default function InversoresTab({ addToast }) {
   const [searchQuery,  setSearchQuery]  = useState('');
 
   useEffect(() => {
-    supabase.from('inversores').select('*').order('created_at', { ascending: false })
+    supabase.from('inversores').select('*').is('deleted_at', null).order('created_at', { ascending: false })
       .then(({ data, error }) => {
         if (error) console.error('[Inversores] Error cargando leads:', error);
         setLeads(data || []);
@@ -477,7 +641,9 @@ export default function InversoresTab({ addToast }) {
         addToast(`🆕 Nuevo lead: ${row.nombre || row.email}`);
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'inversores' }, ({ new: row }) => {
-        setLeads(prev => prev.map(l => l.id === row.id ? row : l));
+        setLeads(prev => row.deleted_at
+          ? prev.filter(l => l.id !== row.id)
+          : prev.map(l => l.id === row.id ? row : l));
       })
       .subscribe();
 
@@ -501,6 +667,21 @@ export default function InversoresTab({ addToast }) {
   const handleStatusChange = useCallback(async (leadId, field, newValue) => {
     const { error } = await supabase.from('inversores').update({ [field]: newValue }).eq('id', leadId);
     if (!error) setLeads(prev => prev.map(l => l.id === leadId ? { ...l, [field]: newValue } : l));
+  }, []);
+
+  const handleDeleteLead = useCallback(async (leadId) => {
+    const { error } = await supabase.from('inversores')
+      .update({ deleted_at: new Date().toISOString() }).eq('id', leadId);
+    if (!error) {
+      setLeads(prev => prev.filter(l => l.id !== leadId));
+      addToast('Lead movido a la papelera');
+    } else {
+      addToast('⚠️ Error al eliminar: ' + error.message);
+    }
+  }, [addToast]);
+
+  const handleRestoreLead = useCallback((restoredLead) => {
+    setLeads(prev => [{ ...restoredLead, deleted_at: null }, ...prev]);
   }, []);
 
   const filteredLeads = leads.filter(l => {
@@ -580,7 +761,7 @@ export default function InversoresTab({ addToast }) {
           <div className="data-table-wrapper">
             <table className="data-table">
               <thead>
-                <tr><th>Nombre</th><th>Email</th><th>WhatsApp</th><th>Capital</th><th>Etapa</th><th>NDA</th><th>PDF</th><th>Fecha</th></tr>
+                <tr><th>Nombre</th><th>Email</th><th>WhatsApp</th><th>Capital</th><th>Etapa</th><th>NDA</th><th>PDF</th><th>Fecha</th><th></th></tr>
               </thead>
               <tbody>
                 {filteredLeads.map(lead => (
@@ -659,10 +840,21 @@ export default function InversoresTab({ addToast }) {
                         : <span style={{ color: 'var(--text-tertiary)' }}>—</span>}
                     </td>
                     <td style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{fmtDate(lead.created_at)}</td>
+                    <td onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => handleDeleteLead(lead.id)}
+                        title="Mover a la papelera"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '4px 6px', display: 'flex', alignItems: 'center', borderRadius: 6, transition: 'color 0.15s' }}
+                        onMouseEnter={e => e.currentTarget.style.color = '#D84315'}
+                        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-tertiary)'}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {!loading && filteredLeads.length === 0 && (
-                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-tertiary)' }}>
+                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-tertiary)' }}>
                     {searchQuery.trim() ? 'Sin resultados para esa búsqueda' : 'Sin leads registrados aún'}
                   </td></tr>
                 )}
@@ -679,7 +871,12 @@ export default function InversoresTab({ addToast }) {
 
       {/* Vista Pipeline */}
       {activeView === 'pipeline' && (
-        <PipelineView leads={leads} onMoveColumn={handleMoveColumn} onOpenModal={setSelectedLead} />
+        <PipelineView leads={leads} onMoveColumn={handleMoveColumn} onOpenModal={setSelectedLead} onDeleteLead={handleDeleteLead} />
+      )}
+
+      {/* Vista Papelera */}
+      {activeView === 'papelera' && (
+        <PapeleraView onRestored={handleRestoreLead} addToast={addToast} />
       )}
 
       {/* Modal de edición de lead */}
