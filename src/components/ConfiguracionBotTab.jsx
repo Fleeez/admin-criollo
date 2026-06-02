@@ -10,7 +10,9 @@ export default function ConfiguracionBotTab({ addToast }) {
   const [platoEstrella,   setPlatoEstrella]   = useState('');
   const [urlPdfMenu,      setUrlPdfMenu]      = useState('');
   const [preciosTexto,    setPreciosTexto]    = useState('');
-  const [listaBlancaVip,  setListaBlancaVip]  = useState('');
+  const [listaVip,        setListaVip]        = useState([]);
+  const [newVipName,      setNewVipName]      = useState('');
+  const [newVipPhone,     setNewVipPhone]     = useState('');
   const [fechasBloqueadas, setFechasBloqueadas] = useState([]);
   const [fechaInput,       setFechaInput]       = useState('');
   const [pdfUploading,     setPdfUploading]     = useState(false);
@@ -47,7 +49,13 @@ export default function ConfiguracionBotTab({ addToast }) {
           setUrlPdfMenu(data.url_pdf_menu          ?? '');
           setPreciosTexto(data.precios_texto       ?? '');
           const rawVip = data.lista_blanca_vip;
-          setListaBlancaVip(Array.isArray(rawVip) ? rawVip.join('\n') : (rawVip ?? ''));
+          if (Array.isArray(rawVip)) {
+            setListaVip(rawVip.map(entry =>
+              typeof entry === 'object' && entry !== null
+                ? { phone: String(entry.phone ?? ''), name: String(entry.name ?? 'VIP') }
+                : { phone: String(entry), name: 'VIP' }
+            ));
+          }
           const rawFechas = data.fechas_bloqueadas;
           setFechasBloqueadas(Array.isArray(rawFechas) ? rawFechas : []);
         }
@@ -76,9 +84,7 @@ export default function ConfiguracionBotTab({ addToast }) {
             plato_estrella:   platoEstrella.trim()   || null,
             url_pdf_menu:     urlPdfMenu.trim()       || null,
             precios_texto:    preciosTexto.trim()     || null,
-            lista_blanca_vip: listaBlancaVip.trim()
-              ? listaBlancaVip.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
-              : [],
+            lista_blanca_vip: listaVip.filter(v => v.phone.trim()),
             fechas_bloqueadas: fechasBloqueadas,
           },
           { onConflict: 'franquicia_id' }
@@ -390,17 +396,17 @@ export default function ConfiguracionBotTab({ addToast }) {
           </div>
 
           <div className="form-group" style={{ marginTop: 16 }}>
-            <label className="form-label">Precios en Texto Libre (override)</label>
+            <label className="form-label">Carta / Actualizaciones del Menú</label>
             <textarea
               className="form-input"
               rows={8}
-              placeholder={'Ejemplos:\nEntradas:\n- Tabla Argenta: $2.800\n- Provoleta: $1.900\n\nPrincipales:\n- Bife de chorizo 400g: $4.500\n- Entraña 300g: $3.800'}
+              placeholder={'Sin PDF → escribí la carta completa:\nEntradas: Tabla de fiambres $4.500, Provoleta $2.800\nPrincipales: Bife de chorizo 350g $18.000, Entraña $14.000\n\nCon PDF → solo las novedades de hoy:\nHoy no hay bife de chorizo.\nEspecial del día: Costillar de cerdo $22.000.'}
               value={preciosTexto}
               onChange={e => setPreciosTexto(e.target.value)}
               style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: 13, lineHeight: 1.6 }}
             />
             <span style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4, display: 'block' }}>
-              Si completás este campo, Bruno usará este texto como menú en lugar de la carta configurada en el sistema
+              Escribí la carta completa (si no tenés PDF) o las novedades del día: especiales, platos agotados, precios actualizados. Bruno usa este texto para responder sobre precios y platos.
             </span>
           </div>
         </div>
@@ -441,29 +447,109 @@ export default function ConfiguracionBotTab({ addToast }) {
             <h3 className="form-section-title" style={{ marginBottom: 0 }}>Clientes VIP</h3>
           </div>
           <p className="form-section-desc">
-            Estos números saltean las restricciones de disponibilidad. Bruno les dará prioridad
-            aunque el local esté completo. Ingresá un número por línea o separados por coma.
+            Estos clientes saltean las restricciones de disponibilidad. Bruno los saluda por nombre
+            y les da prioridad aunque el local esté completo.
           </p>
 
-          <div className="form-group">
-            <label className="form-label">
-              <Users size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
-              Números VIP (formato: +549XXXXXXXXXX)
-            </label>
-            <textarea
-              className="form-input"
-              rows={5}
-              placeholder={'+5493512345678\n+5491155556789\n+5493351234000'}
-              value={listaBlancaVip}
-              onChange={e => setListaBlancaVip(e.target.value)}
-              style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: 13, lineHeight: 1.8 }}
-            />
-            <span style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4, display: 'block' }}>
-              {listaBlancaVip.trim()
-                ? `${listaBlancaVip.split(/[\n,]+/).filter(l => l.trim()).length} número(s) configurado(s)`
-                : 'Sin clientes VIP configurados'}
-            </span>
+          {/* Lista existente */}
+          {listaVip.length === 0 ? (
+            <div style={{ fontSize: 13, color: 'var(--text-tertiary)', fontStyle: 'italic', marginBottom: 16 }}>
+              Sin clientes VIP configurados
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+              {listaVip.map((vip, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 14px', borderRadius: 10,
+                  background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
+                }}>
+                  <Users size={15} color="var(--accent-olive)" style={{ flexShrink: 0 }} />
+                  <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', minWidth: 100 }}>
+                    {vip.name}
+                  </span>
+                  <span style={{ fontSize: 13, color: 'var(--text-tertiary)', fontFamily: 'monospace', flex: 1 }}>
+                    {vip.phone}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setListaVip(prev => prev.filter((_, j) => j !== i))}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px',
+                      color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center',
+                      borderRadius: 6, fontFamily: 'inherit',
+                    }}
+                    title="Quitar VIP"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Agregar nuevo VIP */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div style={{ flex: '1 1 140px' }}>
+              <label className="form-label" style={{ fontSize: 11 }}>Nombre</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Juan Pérez"
+                value={newVipName}
+                onChange={e => setNewVipName(e.target.value)}
+                style={{ padding: '7px 10px', fontSize: 13 }}
+              />
+            </div>
+            <div style={{ flex: '2 1 180px' }}>
+              <label className="form-label" style={{ fontSize: 11 }}>Teléfono (formato +549...)</label>
+              <input
+                type="tel"
+                className="form-input"
+                placeholder="+5491155556789"
+                value={newVipPhone}
+                onChange={e => setNewVipPhone(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const phone = newVipPhone.trim();
+                    const name  = newVipName.trim() || 'VIP';
+                    if (phone && !listaVip.some(v => v.phone === phone)) {
+                      setListaVip(prev => [...prev, { phone, name }]);
+                      setNewVipPhone('');
+                      setNewVipName('');
+                    }
+                  }
+                }}
+                style={{ padding: '7px 10px', fontSize: 13, fontFamily: 'monospace' }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const phone = newVipPhone.trim();
+                const name  = newVipName.trim() || 'VIP';
+                if (phone && !listaVip.some(v => v.phone === phone)) {
+                  setListaVip(prev => [...prev, { phone, name }]);
+                  setNewVipPhone('');
+                  setNewVipName('');
+                }
+              }}
+              style={{
+                padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                background: 'var(--accent-olive)', color: '#fff',
+                border: 'none', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                marginBottom: 1,
+              }}
+            >
+              + Agregar VIP
+            </button>
           </div>
+          <span style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8, display: 'block' }}>
+            {listaVip.length > 0
+              ? `${listaVip.length} cliente(s) VIP — Bruno los saluda por nombre`
+              : 'Ingresá nombre y teléfono para agregar un VIP'}
+          </span>
         </div>
 
         {/* ── Footer ─────────────────────────────────────────────────────────── */}
