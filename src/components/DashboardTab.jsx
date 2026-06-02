@@ -1,9 +1,10 @@
-import React from 'react';
-import { Calendar, Zap, Users, AlertTriangle, ArrowRight, CheckCircle, TrendingUp } from 'lucide-react';
+import React, { useState } from 'react';
+import { Calendar, Zap, Users, AlertTriangle, ArrowRight, CheckCircle, TrendingUp, Search } from 'lucide-react';
 
 const MAX_CAPACITY = 60;
 
-export default function DashboardTab({ conversations, appointments, onNavigateToTab, onSelectConversation }) {
+export default function DashboardTab({ conversations, appointments, onNavigateToTab, onSelectConversation, onOpenDrawer }) {
+  const [searchConv, setSearchConv] = useState('');
   const today = new Date().toISOString().split('T')[0];
 
   // KPI calculations
@@ -13,6 +14,10 @@ export default function DashboardTab({ conversations, appointments, onNavigateTo
   const botActiveCount = conversations.filter(c => c.botActive).length;
   const automationRate = conversations.length > 0 ? Math.round((botActiveCount / conversations.length) * 100) : 0;
   const urgentChats    = conversations.filter(c => !c.botActive);
+  const filteredUrgent = urgentChats.filter(c =>
+    c.name.toLowerCase().includes(searchConv.toLowerCase()) ||
+    (c.phone || '').includes(searchConv)
+  );
 
   // Last 7 days bar chart data
   const last7 = Array.from({ length: 7 }, (_, i) => {
@@ -160,6 +165,26 @@ export default function DashboardTab({ conversations, appointments, onNavigateTo
               Ver todas <ArrowRight size={16} />
             </button>
           </div>
+
+          {urgentChats.length > 0 && (
+            <div style={{ position: 'relative', marginBottom: 12 }}>
+              <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
+              <input
+                type="text"
+                placeholder="Buscar cliente..."
+                value={searchConv}
+                onChange={e => setSearchConv(e.target.value)}
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  paddingLeft: 30, paddingRight: 10, paddingTop: 7, paddingBottom: 7,
+                  border: '1px solid var(--border-color)', borderRadius: 8,
+                  fontSize: 13, background: 'var(--bg-primary)', color: 'var(--text-primary)',
+                  outline: 'none', fontFamily: 'inherit',
+                }}
+              />
+            </div>
+          )}
+
           {urgentChats.length === 0 ? (
             <div className="empty-state-inline">
               <CheckCircle size={28} style={{ color: 'var(--accent-olive)' }} />
@@ -176,7 +201,9 @@ export default function DashboardTab({ conversations, appointments, onNavigateTo
                   </tr>
                 </thead>
                 <tbody>
-                  {urgentChats.map(conv => (
+                  {filteredUrgent.length === 0 ? (
+                    <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 16 }}>Sin resultados</td></tr>
+                  ) : filteredUrgent.map(conv => (
                     <tr key={conv.id}>
                       <td>
                         <div className="user-cell">
@@ -184,16 +211,16 @@ export default function DashboardTab({ conversations, appointments, onNavigateTo
                           <span style={{ fontWeight: 600 }}>{conv.name}</span>
                         </div>
                       </td>
-                      <td style={{ color: 'var(--text-secondary)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <td style={{ color: 'var(--text-secondary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {conv.lastMessage}
                       </td>
                       <td>
                         <button
-                          className="btn-link"
-                          onClick={() => onSelectConversation(conv.id)}
-                          style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-terracotta)' }}
+                          className="btn-primary"
+                          onClick={() => onOpenDrawer ? onOpenDrawer(conv.id) : onSelectConversation(conv.id)}
+                          style={{ fontSize: 12, padding: '5px 12px', background: 'var(--accent-terracotta)', borderColor: 'var(--accent-terracotta)', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
                         >
-                          Intervenir
+                          <AlertTriangle size={12} /> Intervenir
                         </button>
                       </td>
                     </tr>

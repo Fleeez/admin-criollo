@@ -303,10 +303,10 @@ function InactivosView({ appointments, addToast }) {
   const calcDaysAgo = dateStr => Math.floor((Date.now() - new Date(dateStr).getTime()) / (24 * 60 * 60 * 1000));
   const displayRows = inactive.length > 0 ? inactive : null;
 
-  const InactiveRow = ({ p, isDemo }) => {
+  const renderRow = (p, isDemo, i) => {
     const days = isDemo ? p.daysAgo : calcDaysAgo(p.lastDate);
     return (
-      <tr>
+      <tr key={i}>
         <td>
           <div className="user-cell">
             <div className="user-cell-avatar">{p.name.charAt(0)}</div>
@@ -314,7 +314,7 @@ function InactivosView({ appointments, addToast }) {
           </div>
         </td>
         <td style={{ color: 'var(--text-secondary)' }}>{p.phone}</td>
-        <td>{(isDemo ? p.lastDate : p.lastDate).split('-').reverse().join('/')}</td>
+        <td>{p.lastDate.split('-').reverse().join('/')}</td>
         <td>
           <span style={{ fontWeight: 700, color: days > 60 ? 'var(--accent-terracotta)' : 'var(--text-primary)' }}>
             {days} días
@@ -324,7 +324,7 @@ function InactivosView({ appointments, addToast }) {
           <button
             className="btn-primary"
             style={{ fontSize: 12, padding: '5px 12px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-            onClick={() => !isDemo && setDiscountModal({ client: p, all: false })}
+            onClick={() => setDiscountModal({ client: p, all: false })}
           >
             <Gift size={12} /> Descuento
           </button>
@@ -365,8 +365,8 @@ function InactivosView({ appointments, addToast }) {
           </thead>
           <tbody>
             {displayRows
-              ? displayRows.map((p, i) => <InactiveRow key={i} p={p} isDemo={false} />)
-              : DEMO_INACTIVE.map((p, i) => <InactiveRow key={i} p={p} isDemo={true} />)
+              ? displayRows.map((p, i) => renderRow(p, false, i))
+              : DEMO_INACTIVE.map((p, i) => renderRow(p, true, i))
             }
           </tbody>
         </table>

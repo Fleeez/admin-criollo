@@ -7,6 +7,7 @@ import ConversationsTab from './components/ConversationsTab';
 import CalendarTab from './components/CalendarTab';
 import IntegrationsTab from './components/IntegrationsTab';
 import InversoresTab from './components/InversoresTab';
+import ChatDrawer from './components/ChatDrawer';
 
 function mapReserva(r) {
   const e = (r.estado ?? '').toLowerCase();
@@ -33,6 +34,7 @@ export default function App({ session }) {
   const [selectedConvId, setSelectedConvId] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('criollo_dark') === '1');
+  const [drawerConvId, setDrawerConvId] = useState(null);
 
   const toggleDarkMode = () => {
     setDarkMode(prev => {
@@ -214,11 +216,12 @@ export default function App({ session }) {
     switch (activeTab) {
       case 'dashboard':
         return (
-          <DashboardTab 
-            conversations={conversations} 
+          <DashboardTab
+            conversations={conversations}
             appointments={appointments}
             onNavigateToTab={setActiveTab}
             onSelectConversation={handleSelectConversation}
+            onOpenDrawer={setDrawerConvId}
           />
         );
       case 'conversaciones':
@@ -385,6 +388,20 @@ export default function App({ session }) {
           {renderTabContent()}
         </div>
       </main>
+
+      {/* Chat Quick Preview Drawer */}
+      {drawerConvId && (() => {
+        const drawerConv = conversations.find(c => c.id === drawerConvId);
+        return drawerConv ? (
+          <ChatDrawer
+            conv={drawerConv}
+            onClose={() => setDrawerConvId(null)}
+            onSendMessage={handleSendMessage}
+            onToggleBot={handleToggleBot}
+            onGoToFull={() => { handleSelectConversation(drawerConvId); setDrawerConvId(null); }}
+          />
+        ) : null;
+      })()}
 
       {/* Toast Notification Container */}
       <div className="toast-container">
