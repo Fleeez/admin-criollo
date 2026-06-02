@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, X, ExternalLink, Calendar, Table2, UserX, Gift, Send, MessageSquare } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, ExternalLink, Calendar, Table2, UserX, Gift, Send, MessageSquare, Edit3, Plus } from 'lucide-react';
 
 const INACTIVE_DAYS = 25;
 
@@ -134,9 +134,99 @@ function DiscountModal({ clients, singleClient, onClose, addToast }) {
   );
 }
 
+// ─── Reserva Form Modal ────────────────────────────────────────
+function ReservaFormModal({ mode, apt, prefillDate, onSave, onClose, addToast }) {
+  const today = new Date().toISOString().split('T')[0];
+  const [form, setForm] = useState({
+    nombre:         apt?.name           || '',
+    telefono:       apt?.phone          || '',
+    fecha:          apt?.date           || prefillDate || today,
+    hora:           apt?.time           || '20:00',
+    personas:       String(apt?.guests  || 2),
+    salon_exterior: apt?.salon_exterior  || 'Salón',
+    estado:         apt?.status         || 'pendiente',
+  });
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!form.nombre.trim())           { addToast('⚠️ El nombre es obligatorio'); return; }
+    if (!form.fecha)                   { addToast('⚠️ La fecha es obligatoria');  return; }
+    if (!form.hora)                    { addToast('⚠️ La hora es obligatoria');   return; }
+    if (!form.personas || Number(form.personas) < 1) { addToast('⚠️ Ingresá el número de personas'); return; }
+    onSave({ ...form, personas: Number(form.personas) });
+    onClose();
+  };
+
+  const lbl = { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-tertiary)', marginBottom: 5, display: 'block' };
+  const inp = { width: '100%', padding: '9px 12px', fontSize: 13, border: '1px solid var(--border-color)', borderRadius: 8, background: 'var(--bg-primary)', color: 'var(--text-primary)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 520, borderRadius: 20 }}>
+        <div className="modal-header">
+          <h3 className="modal-title">{mode === 'edit' ? 'Editar Reserva' : 'Nueva Reserva'}</h3>
+          <button className="btn-close" onClick={onClose}><X size={20} /></button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 20px' }}>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={lbl}>Nombre del cliente *</label>
+              <input style={inp} placeholder="Nombre y apellido" value={form.nombre} onChange={e => set('nombre', e.target.value)} />
+            </div>
+            <div>
+              <label style={lbl}>Teléfono</label>
+              <input style={inp} type="tel" placeholder="+54 9 351..." value={form.telefono} onChange={e => set('telefono', e.target.value)} />
+            </div>
+            <div>
+              <label style={lbl}>Fecha *</label>
+              <input style={inp} type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)} />
+            </div>
+            <div>
+              <label style={lbl}>Hora *</label>
+              <input style={inp} type="time" value={form.hora} onChange={e => set('hora', e.target.value)} />
+            </div>
+            <div>
+              <label style={lbl}>Personas *</label>
+              <input style={inp} type="number" min="1" max="50" value={form.personas} onChange={e => set('personas', e.target.value)} />
+            </div>
+            <div>
+              <label style={lbl}>Ubicación</label>
+              <select style={inp} value={form.salon_exterior} onChange={e => set('salon_exterior', e.target.value)}>
+                <option value="Salón">Salón</option>
+                <option value="Exterior">Exterior</option>
+              </select>
+            </div>
+            {mode === 'edit' && (
+              <div>
+                <label style={lbl}>Estado</label>
+                <select style={inp} value={form.estado} onChange={e => set('estado', e.target.value)}>
+                  <option value="pendiente">Pendiente</option>
+                  <option value="completada">Completada</option>
+                  <option value="cancelada">Cancelada</option>
+                </select>
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--border-color)' }}>
+            <button type="submit" className="btn-primary" style={{ flex: 1 }}>
+              {mode === 'edit' ? 'Guardar Cambios' : 'Crear Reserva'}
+            </button>
+            <button type="button" onClick={onClose} style={{ flex: 1, background: 'none', border: '1px solid var(--border-color)', borderRadius: 8, padding: '10px 16px', fontSize: 14, cursor: 'pointer', color: 'var(--text-secondary)', fontFamily: 'inherit' }}>
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Calendario View ──────────────────────────────────────────
-function CalendarioView({ appointments, currentMonth, currentYear, setCurrentMonth, setCurrentYear, onSelectApt, onMoveAppointment, addToast }) {
+function CalendarioView({ appointments, currentMonth, currentYear, setCurrentMonth, setCurrentYear, onSelectApt, onMoveAppointment, addToast, onOpenForm }) {
   const [dragOverDate, setDragOverDate] = useState(null);
+  const [hoverCell,    setHoverCell]    = useState(null);
 
   const calendarDays = getDaysInMonth(currentMonth, currentYear);
   const today = new Date().toISOString().split('T')[0];
@@ -181,7 +271,12 @@ function CalendarioView({ appointments, currentMonth, currentYear, setCurrentMon
             <div
               key={idx}
               className={`calendar-cell ${cell.isCurrentMonth ? '' : 'outside-month'} ${isToday ? 'today' : ''}`}
-              style={isDragOver ? { outline: '2px dashed var(--accent-gold)', background: 'rgba(212,163,115,0.08)' } : undefined}
+              style={{
+                position: 'relative',
+                ...(isDragOver ? { outline: '2px dashed var(--accent-gold)', background: 'rgba(212,163,115,0.08)' } : {}),
+              }}
+              onMouseEnter={() => cell.isCurrentMonth && setHoverCell(cell.dateStr)}
+              onMouseLeave={() => setHoverCell(null)}
               onDragOver={e => { e.preventDefault(); setDragOverDate(cell.dateStr); }}
               onDragLeave={() => setDragOverDate(null)}
               onDrop={e => {
@@ -209,6 +304,23 @@ function CalendarioView({ appointments, currentMonth, currentYear, setCurrentMon
                   </button>
                 ))}
               </div>
+              {cell.isCurrentMonth && (
+                <button
+                  title="Nueva reserva"
+                  onClick={e => { e.stopPropagation(); onOpenForm({ mode: 'add', prefillDate: cell.dateStr }); }}
+                  style={{
+                    position: 'absolute', bottom: 5, right: 5,
+                    width: 20, height: 20, borderRadius: '50%',
+                    background: 'var(--accent-terracotta)', color: '#fff',
+                    border: 'none', cursor: 'pointer',
+                    fontSize: 16, fontWeight: 700, lineHeight: 1,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    opacity: hoverCell === cell.dateStr ? 1 : 0,
+                    transition: 'opacity 0.15s',
+                    zIndex: 2,
+                  }}
+                >+</button>
+              )}
             </div>
           );
         })}
@@ -224,14 +336,25 @@ function CalendarioView({ appointments, currentMonth, currentYear, setCurrentMon
 }
 
 // ─── Tabla View ───────────────────────────────────────────────
-function TablaView({ appointments, onSelectApt }) {
+function TablaView({ appointments, onSelectApt, onOpenForm }) {
+  const today = new Date().toISOString().split('T')[0];
   const sorted = [...appointments].sort((a, b) => {
     if (a.date !== b.date) return b.date.localeCompare(a.date);
     return (b.time || '').localeCompare(a.time || '');
   });
 
   return (
-    <div className="data-table-wrapper" style={{ marginTop: 8 }}>
+    <div style={{ marginTop: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        <button
+          className="btn-primary"
+          onClick={() => onOpenForm({ mode: 'add', prefillDate: today })}
+          style={{ fontSize: 13, padding: '7px 16px', display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          <Plus size={14} /> Nueva Reserva
+        </button>
+      </div>
+      <div className="data-table-wrapper">
       {sorted.length === 0 ? (
         <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)' }}>No hay reservas registradas</div>
       ) : (
@@ -279,6 +402,7 @@ function TablaView({ appointments, onSelectApt }) {
           </tbody>
         </table>
       )}
+      </div>
     </div>
   );
 }
@@ -390,11 +514,18 @@ function InactivosView({ appointments, addToast }) {
 }
 
 // ─── Main ─────────────────────────────────────────────────────
-export default function CalendarTab({ appointments, onSelectConversation, onMoveAppointment, addToast }) {
-  const [activeView, setActiveView] = useState('calendario');
+export default function CalendarTab({ appointments, onSelectConversation, onMoveAppointment, onAddAppointment, onUpdateAppointment, addToast }) {
+  const [activeView,   setActiveView]   = useState('calendario');
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [selectedApt, setSelectedApt] = useState(null);
+  const [currentYear,  setCurrentYear]  = useState(2026);
+  const [selectedApt,  setSelectedApt]  = useState(null);
+  const [formModal,    setFormModal]    = useState(null);
+
+  const handleFormSave = (data) => {
+    if (formModal.mode === 'edit') onUpdateAppointment(formModal.apt.id, data);
+    else                           onAddAppointment(data);
+    setFormModal(null);
+  };
 
   const views = [
     { id: 'calendario', label: 'Calendario', icon: <Calendar size={14} /> },
@@ -425,10 +556,11 @@ export default function CalendarTab({ appointments, onSelectConversation, onMove
           setCurrentYear={setCurrentYear}
           onSelectApt={setSelectedApt}
           onMoveAppointment={onMoveAppointment}
+          onOpenForm={setFormModal}
           addToast={addToast}
         />
       )}
-      {activeView === 'tabla'      && <TablaView appointments={appointments} onSelectApt={setSelectedApt} />}
+      {activeView === 'tabla' && <TablaView appointments={appointments} onSelectApt={setSelectedApt} onOpenForm={setFormModal} />}
       {activeView === 'inactivos'  && <InactivosView appointments={appointments} addToast={addToast} />}
 
       {/* Appointment detail modal */}
@@ -457,21 +589,48 @@ export default function CalendarTab({ appointments, onSelectConversation, onMove
                 </span>
               </div>
               <div className="detail-row"><span className="detail-label">Estado</span><span className="detail-value"><StatusBadge status={selectedApt.status} /></span></div>
+              {/* Fila de acciones */}
+              <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+                <button
+                  className="btn-primary"
+                  onClick={() => {
+                    if (selectedApt.name === 'Agustín') onSelectConversation('conv_1');
+                    else if (selectedApt.name === 'María') onSelectConversation('conv_2');
+                    else if (selectedApt.name.includes('Carlos')) onSelectConversation('conv_3');
+                    setSelectedApt(null);
+                  }}
+                  style={{ flex: 1, justifyContent: 'center' }}
+                >
+                  Supervisar Chat <ExternalLink size={14} />
+                </button>
+                <button
+                  onClick={() => { setFormModal({ mode: 'edit', apt: selectedApt }); setSelectedApt(null); }}
+                  style={{ flex: 1, background: 'var(--accent-olive)', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 14px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: 'inherit' }}
+                >
+                  <Edit3 size={14} /> Editar
+                </button>
+              </div>
               <button
-                className="btn-primary"
-                onClick={() => {
-                  if (selectedApt.name === 'Agustín') onSelectConversation('conv_1');
-                  else if (selectedApt.name === 'María') onSelectConversation('conv_2');
-                  else if (selectedApt.name.includes('Carlos')) onSelectConversation('conv_3');
-                  setSelectedApt(null);
-                }}
-                style={{ marginTop: 16, display: 'flex', justifyContent: 'center', width: '100%' }}
+                onClick={async () => { await onUpdateAppointment(selectedApt.id, { estado: 'cancelada' }); setSelectedApt(null); }}
+                style={{ width: '100%', marginTop: 8, background: 'none', border: '1px solid var(--status-paused-text)', color: 'var(--status-paused-text)', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
               >
-                Supervisar Chat <ExternalLink size={16} />
+                Cancelar reserva
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Form modal: crear o editar reserva */}
+      {formModal && (
+        <ReservaFormModal
+          mode={formModal.mode}
+          apt={formModal.apt || null}
+          prefillDate={formModal.prefillDate || null}
+          onSave={handleFormSave}
+          onClose={() => setFormModal(null)}
+          addToast={addToast}
+        />
       )}
     </div>
   );

@@ -184,6 +184,43 @@ export default function App({ session }) {
     }, 3000);
   };
 
+  // Create a new reservation
+  const handleAddAppointment = async (data) => {
+    const fechaIso = `${data.fecha}T${data.hora}:00`;
+    const { error } = await supabase.from('reservas').insert({
+      nombre:         data.nombre,
+      telefono:       data.telefono || null,
+      fecha:          data.fecha,
+      hora:           data.hora,
+      personas:       Number(data.personas),
+      salon_exterior: data.salon_exterior || 'Salón',
+      estado:         data.estado || 'pendiente',
+      fecha_iso:      fechaIso,
+    });
+    if (error) addToast('⚠️ Error al crear la reserva: ' + error.message);
+    else       addToast('✓ Reserva creada');
+  };
+
+  // Update fields of an existing reservation
+  const handleUpdateAppointment = async (aptId, updates) => {
+    const apt   = appointments.find(a => a.id === aptId);
+    const hora  = updates.hora  ?? apt?.time ?? '00:00';
+    const fecha = updates.fecha ?? apt?.date ?? '';
+    const payload = {
+      ...(updates.nombre         !== undefined && { nombre:         updates.nombre }),
+      ...(updates.telefono       !== undefined && { telefono:       updates.telefono }),
+      ...(updates.fecha          !== undefined && { fecha:          updates.fecha }),
+      ...(updates.hora           !== undefined && { hora:           updates.hora }),
+      ...(updates.personas       !== undefined && { personas:       Number(updates.personas) }),
+      ...(updates.salon_exterior !== undefined && { salon_exterior: updates.salon_exterior }),
+      ...(updates.estado         !== undefined && { estado:         updates.estado }),
+      ...(fecha                               && { fecha_iso:       `${fecha}T${hora}:00` }),
+    };
+    const { error } = await supabase.from('reservas').update(payload).eq('id', aptId);
+    if (error) addToast('⚠️ Error al actualizar la reserva: ' + error.message);
+    else       addToast('✓ Reserva actualizada');
+  };
+
   // Move appointment to a new date (drag & drop in CalendarTab)
   const handleMoveAppointment = async (aptId, newDate) => {
     const apt = appointments.find(a => a.id === aptId);
@@ -241,6 +278,8 @@ export default function App({ session }) {
             appointments={appointments}
             onSelectConversation={handleSelectConversation}
             onMoveAppointment={handleMoveAppointment}
+            onAddAppointment={handleAddAppointment}
+            onUpdateAppointment={handleUpdateAppointment}
             addToast={addToast}
           />
         );
