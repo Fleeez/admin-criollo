@@ -37,6 +37,12 @@ export default function App({ session }) {
   const [toasts, setToasts] = useState([]);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('criollo_dark') === '1');
   const [drawerConvId, setDrawerConvId] = useState(null);
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(t);
+  }, []);
 
   const toggleDarkMode = () => {
     setDarkMode(prev => {
@@ -437,16 +443,17 @@ export default function App({ session }) {
             >
               {darkMode ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            {integrations.supabaseUrl && (
-              <span className="status-badge connected">
-                <span className="dot"></span> Supabase Conectado
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>
+              <span style={{ textTransform: 'capitalize' }}>
+                {now.toLocaleDateString('es-AR', { weekday: 'short' }).replace('.', '')}
               </span>
-            )}
-            {integrations.phoneId && (
-              <span className="status-badge connected">
-                <span className="dot"></span> WhatsApp API Activa
+              <span style={{ opacity: 0.3 }}>·</span>
+              <span>{now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+              <span style={{ opacity: 0.3 }}>·</span>
+              <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.02em' }}>
+                {now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
               </span>
-            )}
+            </div>
           </div>
         </header>
 
