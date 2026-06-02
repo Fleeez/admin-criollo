@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Save, Star, FileText, Link, Users, Zap, Calendar } from 'lucide-react';
+import { Bot, Save, Star, FileText, Link, Users, Zap, Calendar, Upload, X } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
 const FRANQUICIA_ID = '1'; // string — coincide con columna TEXT en Supabase
@@ -11,11 +11,14 @@ export default function ConfiguracionBotTab({ addToast }) {
   const [urlPdfMenu,      setUrlPdfMenu]      = useState('');
   const [preciosTexto,    setPreciosTexto]    = useState('');
   const [listaBlancaVip,  setListaBlancaVip]  = useState('');
-  const [isLoading,       setIsLoading]       = useState(false);
-  const [lastSaved,       setLastSaved]       = useState(null);
-  const [isInitializing,  setIsInitializing]  = useState(true);
-  const [loadError,       setLoadError]       = useState(null);
-  const [retryKey,        setRetryKey]        = useState(0); // incrementar para reintentar
+  const [fechasBloqueadas, setFechasBloqueadas] = useState([]);
+  const [fechaInput,       setFechaInput]       = useState('');
+  const [pdfUploading,     setPdfUploading]     = useState(false);
+  const [isLoading,        setIsLoading]        = useState(false);
+  const [lastSaved,        setLastSaved]        = useState(null);
+  const [isInitializing,   setIsInitializing]   = useState(true);
+  const [loadError,        setLoadError]        = useState(null);
+  const [retryKey,         setRetryKey]         = useState(0);
 
   // Carga inicial desde Supabase
   useEffect(() => {
@@ -43,9 +46,10 @@ export default function ConfiguracionBotTab({ addToast }) {
           setPlatoEstrella(data.plato_estrella     ?? '');
           setUrlPdfMenu(data.url_pdf_menu          ?? '');
           setPreciosTexto(data.precios_texto       ?? '');
-          // lista_blanca_vip puede ser TEXT[] (array) o TEXT según el esquema — normalizar siempre a string
           const rawVip = data.lista_blanca_vip;
           setListaBlancaVip(Array.isArray(rawVip) ? rawVip.join('\n') : (rawVip ?? ''));
+          const rawFechas = data.fechas_bloqueadas;
+          setFechasBloqueadas(Array.isArray(rawFechas) ? rawFechas : []);
         }
       } catch (err) {
         if (mounted) setLoadError(err.message || 'Error desconocido');
@@ -75,6 +79,7 @@ export default function ConfiguracionBotTab({ addToast }) {
             lista_blanca_vip: listaBlancaVip.trim()
               ? listaBlancaVip.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
               : [],
+            fechas_bloqueadas: fechasBloqueadas,
           },
           { onConflict: 'franquicia_id' }
         );
@@ -86,6 +91,24 @@ export default function ConfiguracionBotTab({ addToast }) {
       addToast(`⚠️ Error al guardar: ${err.message}`);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handlePdfUpload(file) {
+    setPdfUploading(true);
+    try {
+      const path = `franquicia-${FRANQUICIA_ID}/carta-menu.pdf`;
+      const { error: uploadError } = await supabase.storage
+        .from('menus')
+        .upload(path, file, { upsert: true, contentType: 'application/pdf' });
+      if (uploadError) throw uploadError;
+      const { data } = supabase.storage.from('menus').getPublicUrl(path);
+      setUrlPdfMenu(data.publicUrl);
+      addToast('✓ PDF subido — URL actualizada automáticamente');
+    } catch (err) {
+      addToast('⚠️ Error al subir PDF: ' + err.message);
+    } finally {
+      setPdfUploading(false);
     }
   }
 
@@ -214,6 +237,92 @@ export default function ConfiguracionBotTab({ addToast }) {
           </div>
         </div>
 
+        {/* ── Sección 1b: Fechas Bloqueadas ─────────────────────────────────── */}
+        <div className="form-section">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <Calendar size={22} color="var(--status-paused-text)" />
+            <h3 className="form-section-title" style={{ marginBottom: 0 }}>Fechas Bloqueadas</h3>
+          </div>
+          <p className="form-section-desc">
+            Bloqueá días específicos en los que Bruno rechazará reservas aunque el toggle general esté activo.
+            Útil para feriados, cierres temporales o eventos privados.
+          </p>
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => {
+                const hoy = new Date().toISOString().split('T')[0];
+                if (!fechasBloqueadas.includes(hoy)) setFechasBloqueadas(prev => [...prev, hoy].sort());
+              }}
+              style={{
+                padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                background: 'rgba(216,67,21,0.1)', color: 'var(--status-paused-text)',
+                border: '1px solid rgba(216,67,21,0.25)', cursor: 'pointer', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}
+            >
+              + Bloquear hoy
+            </button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                type="date"
+                className="form-input"
+                value={fechaInput}
+                onChange={e => setFechaInput(e.target.value)}
+                style={{ padding: '7px 10px', fontSize: 13, maxWidth: 180 }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (fechaInput && !fechasBloqueadas.includes(fechaInput)) {
+                    setFechasBloqueadas(prev => [...prev, fechaInput].sort());
+                    setFechaInput('');
+                  }
+                }}
+                style={{
+                  padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  background: 'var(--accent-olive)', color: '#fff',
+                  border: 'none', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                }}
+              >
+                Agregar fecha
+              </button>
+            </div>
+          </div>
+
+          {fechasBloqueadas.length === 0 ? (
+            <div style={{ fontSize: 13, color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+              Sin fechas bloqueadas — las reservas están disponibles todos los días activos
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {fechasBloqueadas.map(fecha => (
+                <div key={fecha} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '4px 6px 4px 12px', borderRadius: 20,
+                  background: 'rgba(216,67,21,0.1)', border: '1px solid rgba(216,67,21,0.22)',
+                  fontSize: 13, fontWeight: 600, color: 'var(--status-paused-text)',
+                }}>
+                  {fecha.split('-').reverse().join('/')}
+                  <button
+                    type="button"
+                    onClick={() => setFechasBloqueadas(prev => prev.filter(f => f !== fecha))}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      padding: '1px 3px', color: 'var(--status-paused-text)',
+                      display: 'flex', alignItems: 'center', opacity: 0.7,
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* ── Sección 2: Carta y Precios ─────────────────────────────────────── */}
         <div className="form-section">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
@@ -238,8 +347,44 @@ export default function ConfiguracionBotTab({ addToast }) {
                 value={urlPdfMenu}
                 onChange={e => setUrlPdfMenu(e.target.value)}
               />
-              <span style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4, display: 'block' }}>
-                Bruno enviará este link cuando el cliente pida ver la carta
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+                <input
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  id="pdf-menu-upload"
+                  style={{ display: 'none' }}
+                  onChange={e => { if (e.target.files[0]) handlePdfUpload(e.target.files[0]); e.target.value = ''; }}
+                />
+                <label
+                  htmlFor="pdf-menu-upload"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 7,
+                    padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                    background: pdfUploading ? 'var(--bg-primary)' : 'var(--accent-terracotta)',
+                    color: pdfUploading ? 'var(--text-tertiary)' : '#fff',
+                    border: pdfUploading ? '1px solid var(--border-color)' : '1px solid transparent',
+                    cursor: pdfUploading ? 'not-allowed' : 'pointer',
+                    pointerEvents: pdfUploading ? 'none' : 'auto',
+                    transition: 'opacity 0.2s',
+                    userSelect: 'none',
+                  }}
+                >
+                  <Upload size={14} />
+                  {pdfUploading ? 'Subiendo...' : 'Subir PDF'}
+                </label>
+                {urlPdfMenu && !pdfUploading && (
+                  <a
+                    href={urlPdfMenu}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: 12, color: 'var(--accent-terracotta)', textDecoration: 'none', fontWeight: 500 }}
+                  >
+                    Ver PDF actual ↗
+                  </a>
+                )}
+              </div>
+              <span style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6, display: 'block' }}>
+                Podés ingresar la URL manualmente o subir el PDF directamente. Requiere bucket <code style={{ fontFamily: 'monospace' }}>menus</code> público en Supabase Storage.
               </span>
             </div>
           </div>
