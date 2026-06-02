@@ -3,6 +3,7 @@ import {
   Users, ExternalLink, X, Save,
   Table2, Calendar, LayoutGrid,
   ChevronDown, ChevronRight, ChevronLeft,
+  Search, MessageCircle, TrendingUp,
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
@@ -14,6 +15,26 @@ const ETAPA_STYLE = {
   'Paso 2':     { backgroundColor: 'rgba(79,109,122,0.1)', color: '#4F6D7A' },
 };
 const DEFAULT_BADGE = { backgroundColor: '#EAE6DF', color: '#5C5854' };
+
+function getCapitalTier(text) {
+  if (!text) return null;
+  const nums = (text.match(/\d+/g) || []).map(Number);
+  const max  = nums.length ? Math.max(...nums) : 0;
+  if (max >= 200) return { tier: 'Premium / Multiunit', bg: 'rgba(212,163,115,0.25)', color: '#8B6914', border: '1px solid rgba(212,163,115,0.5)' };
+  if (max >= 100) return { tier: 'Avenida',             bg: 'rgba(156,163,175,0.2)',  color: '#6B7280', border: '1px solid rgba(156,163,175,0.4)' };
+  if (max > 0)    return { tier: 'Express',             bg: 'rgba(180,83,9,0.15)',    color: '#B45309', border: '1px solid rgba(180,83,9,0.3)'  };
+  return null;
+}
+
+function calcCapitalPipeline(leads) {
+  let total = 0;
+  leads.forEach(l => {
+    const nums = ((l.capital_disponible || '').match(/\d+/g) || []).map(Number);
+    if (nums.length) total += nums.reduce((a, b) => a + b, 0) / nums.length;
+  });
+  if (total >= 1000) return `$${(total / 1000).toFixed(1)}M`;
+  return total > 0 ? `$${Math.round(total)}k` : '$0k';
+}
 
 const KANBAN_COLS = [
   { id: 'Sin contactar',    bg: '#EAE6DF',                       text: '#5C5854'  },
@@ -439,6 +460,7 @@ export default function InversoresTab({ addToast }) {
   const [loading,      setLoading]      = useState(true);
   const [activeView,   setActiveView]   = useState('tabla');
   const [selectedLead, setSelectedLead] = useState(null);
+  const [searchQuery,  setSearchQuery]  = useState('');
 
   useEffect(() => {
     supabase.from('inversores').select('*').order('created_at', { ascending: false })
@@ -476,10 +498,21 @@ export default function InversoresTab({ addToast }) {
     if (!error) setLeads(prev => prev.map(l => l.id === leadId ? { ...l, estado_lead: newColumn } : l));
   }, []);
 
+  const handleStatusChange = useCallback(async (leadId, field, newValue) => {
+    const { error } = await supabase.from('inversores').update({ [field]: newValue }).eq('id', leadId);
+    if (!error) setLeads(prev => prev.map(l => l.id === leadId ? { ...l, [field]: newValue } : l));
+  }, []);
+
+  const filteredLeads = leads.filter(l => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (l.nombre || '').toLowerCase().includes(q) || (l.email || '').toLowerCase().includes(q);
+  });
+
   return (
     <div className="dashboard-view">
       {/* Stats */}
-      <div className="card-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+      <div className="card-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
         <div className="stat-card">
           <div className="stat-header"><span className="stat-title">Total leads</span><div className="stat-icon-wrapper"><Users size={18} /></div></div>
           <span className="stat-value">{leads.length}</span>
@@ -494,6 +527,11 @@ export default function InversoresTab({ addToast }) {
           <div className="stat-header"><span className="stat-title">Completos</span><div className="stat-icon-wrapper"><Users size={18} /></div></div>
           <span className="stat-value">{leads.filter(l => l.etapa_formulario === 'Completado').length}</span>
           <span className="stat-desc">Formulario terminado</span>
+        </div>
+        <div className="stat-card">
+          <div className="stat-header"><span className="stat-title">Capital en Pipeline</span><div className="stat-icon-wrapper"><TrendingUp size={18} /></div></div>
+          <span className="stat-value" style={{ fontSize: 28 }}>{calcCapitalPipeline(leads)}</span>
+          <span className="stat-desc">Estimado agregado del pipeline</span>
         </div>
       </div>
 
@@ -519,23 +557,102 @@ export default function InversoresTab({ addToast }) {
           <div className="section-header">
             <h3 className="section-title">Leads de inversores</h3>
             <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-              {loading ? 'Cargando...' : `${leads.length} registros — click en fila para editar`}
+              {loading
+                ? 'Cargando...'
+                : searchQuery.trim()
+                  ? `${filteredLeads.length} de ${leads.length} — click en fila para editar`
+                  : `${leads.length} registros — click en fila para editar`}
             </span>
           </div>
+
+          {/* Buscador */}
+          <div style={{ position: 'relative', marginBottom: 16 }}>
+            <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)', pointerEvents: 'none' }} />
+            <input
+              type="text"
+              placeholder="Buscar por nombre o email..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{ ...INPUT_STYLE, paddingLeft: 34, paddingRight: 12 }}
+            />
+          </div>
+
           <div className="data-table-wrapper">
             <table className="data-table">
               <thead>
                 <tr><th>Nombre</th><th>Email</th><th>WhatsApp</th><th>Capital</th><th>Etapa</th><th>NDA</th><th>PDF</th><th>Fecha</th></tr>
               </thead>
               <tbody>
-                {leads.map(lead => (
+                {filteredLeads.map(lead => (
                   <tr key={lead.id} onClick={() => setSelectedLead(lead)} style={{ cursor: 'pointer' }} title="Click para editar">
                     <td><div className="user-cell"><div className="user-cell-avatar">{(lead.nombre || lead.email || '?').charAt(0).toUpperCase()}</div><span style={{ fontWeight: 600 }}>{lead.nombre || '—'}</span></div></td>
                     <td style={{ color: 'var(--text-secondary)' }}>{lead.email || '—'}</td>
-                    <td>{lead.whatsapp || '—'}</td>
-                    <td>{lead.capital_disponible || '—'}</td>
-                    <td><span className="badge" style={ETAPA_STYLE[lead.etapa_formulario] || DEFAULT_BADGE}>{lead.etapa_formulario || '—'}</span></td>
-                    <td><span className="badge" style={lead.estado_nda === 'Firmado' ? { backgroundColor: 'rgba(46,125,50,0.1)', color: '#2E7D32' } : DEFAULT_BADGE}>{lead.estado_nda || '—'}</span></td>
+
+                    {/* WhatsApp — enlace directo a wa.me */}
+                    <td onClick={e => e.stopPropagation()}>
+                      {lead.whatsapp ? (
+                        <a
+                          href={`https://wa.me/${lead.whatsapp.replace(/\D/g, '')}`}
+                          target="_blank" rel="noreferrer"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#25D366', fontWeight: 500, fontSize: 13, textDecoration: 'none', transition: 'opacity 0.15s' }}
+                          onMouseEnter={e => e.currentTarget.style.opacity = '0.7'}
+                          onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                        >
+                          <MessageCircle size={13} /> {lead.whatsapp}
+                        </a>
+                      ) : <span style={{ color: 'var(--text-tertiary)' }}>—</span>}
+                    </td>
+
+                    {/* Capital — badge de tier + rango en texto pequeño */}
+                    <td>
+                      {(() => {
+                        const t = getCapitalTier(lead.capital_disponible);
+                        if (!t) return <span style={{ color: 'var(--text-tertiary)' }}>—</span>;
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, background: t.bg, color: t.color, border: t.border, whiteSpace: 'nowrap' }}>
+                              {t.tier}
+                            </span>
+                            <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{lead.capital_disponible}</span>
+                          </div>
+                        );
+                      })()}
+                    </td>
+
+                    {/* Etapa — select inline estilizado como badge */}
+                    <td onClick={e => e.stopPropagation()}>
+                      <select
+                        value={lead.etapa_formulario || ''}
+                        onChange={e => handleStatusChange(lead.id, 'etapa_formulario', e.target.value)}
+                        style={{
+                          ...(ETAPA_STYLE[lead.etapa_formulario] || DEFAULT_BADGE),
+                          padding: '4px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600,
+                          border: 'none', cursor: 'pointer', fontFamily: 'inherit', outline: 'none',
+                          appearance: 'none', WebkitAppearance: 'none',
+                        }}
+                      >
+                        {['Paso 1', 'Paso 2', 'Paso 3', 'Completado'].map(v => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                    </td>
+
+                    {/* NDA — select inline estilizado como badge */}
+                    <td onClick={e => e.stopPropagation()}>
+                      <select
+                        value={lead.estado_nda || ''}
+                        onChange={e => handleStatusChange(lead.id, 'estado_nda', e.target.value)}
+                        style={{
+                          ...(lead.estado_nda === 'Firmado'
+                            ? { backgroundColor: 'rgba(46,125,50,0.1)', color: '#2E7D32' }
+                            : DEFAULT_BADGE),
+                          padding: '4px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600,
+                          border: 'none', cursor: 'pointer', fontFamily: 'inherit', outline: 'none',
+                          appearance: 'none', WebkitAppearance: 'none',
+                        }}
+                      >
+                        {['Pendiente', 'Firmado'].map(v => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                    </td>
+
                     <td onClick={e => e.stopPropagation()}>
                       {lead.documento_pdf_url
                         ? <a href={lead.documento_pdf_url} target="_blank" rel="noreferrer" className="btn-link" style={{ fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><ExternalLink size={13} /> Ver</a>
@@ -544,8 +661,10 @@ export default function InversoresTab({ addToast }) {
                     <td style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{fmtDate(lead.created_at)}</td>
                   </tr>
                 ))}
-                {!loading && leads.length === 0 && (
-                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-tertiary)' }}>Sin leads registrados aún</td></tr>
+                {!loading && filteredLeads.length === 0 && (
+                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-tertiary)' }}>
+                    {searchQuery.trim() ? 'Sin resultados para esa búsqueda' : 'Sin leads registrados aún'}
+                  </td></tr>
                 )}
               </tbody>
             </table>
