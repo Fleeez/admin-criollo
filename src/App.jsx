@@ -235,7 +235,7 @@ export default function App({ session }) {
 
     // ── Realtime: inversores ──────────────────────────────────────────────────
     const invChannel = supabase
-      .channel('inversores-live')
+      .channel('app-inversores-notif')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inversores' }, (payload) => {
         const inv = payload.new;
         addNotification('inversor', 'Nuevo lead inversor', inv.nombre || inv.whatsapp || '');
