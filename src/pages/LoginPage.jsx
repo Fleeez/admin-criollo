@@ -1,26 +1,54 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
-export default function LoginPage() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+export default function LoginPage({ onBypassLogin }) {
+  const [loading,     setLoading]     = useState(false);
+  const [error,       setError]       = useState(null);
+  const [user,        setUser]        = useState('');
+  const [pass,        setPass]        = useState('');
+  const [loadingPass, setLoadingPass] = useState(false);
+  const [errPass,     setErrPass]     = useState(null);
 
   async function handleGoogleLogin() {
     setLoading(true);
     setError(null);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo: window.location.origin + '/',
-      },
+      options: { redirectTo: window.location.origin + '/' },
     });
     if (error) {
-      console.error('Error OAuth:', error.message);
       setError(error.message);
       setLoading(false);
     }
-    // Si no hay error, el browser redirige a Google — loading queda true (esperado)
   }
+
+  function handlePassLogin(e) {
+    e.preventDefault();
+    setErrPass(null);
+    setLoadingPass(true);
+
+    setTimeout(() => {
+      if (user.trim() === 'criolloadmin' && pass === 'criolloadmin2026') {
+        onBypassLogin?.();
+      } else {
+        setErrPass('Usuario o contraseña incorrectos');
+      }
+      setLoadingPass(false);
+    }, 400);
+  }
+
+  const inp = {
+    width: '100%',
+    padding: '10px 14px',
+    borderRadius: 10,
+    border: '1px solid rgba(255,255,255,0.12)',
+    background: 'rgba(255,255,255,0.06)',
+    color: '#F0EBE3',
+    fontSize: 14,
+    fontFamily: 'inherit',
+    outline: 'none',
+    boxSizing: 'border-box',
+  };
 
   return (
     <div className="login-page">
@@ -29,6 +57,7 @@ export default function LoginPage() {
         <h1 className="login-title">Criollo</h1>
         <p className="login-subtitle">Portal de Franquicias</p>
 
+        {/* Google OAuth */}
         <button className="login-btn" onClick={handleGoogleLogin} disabled={loading}>
           {loading ? (
             <span style={{ opacity: 0.7 }}>Redirigiendo...</span>
@@ -46,12 +75,64 @@ export default function LoginPage() {
         </button>
 
         {error && (
-          <p style={{ color: '#E53935', fontSize: '0.8rem', textAlign: 'center', marginTop: '8px', maxWidth: '280px' }}>
+          <p style={{ color: '#E53935', fontSize: '0.8rem', textAlign: 'center', marginTop: 8 }}>
             Error: {error}
           </p>
         )}
 
-        <p className="login-footer">OptiCore · Sistema de Gestión</p>
+        {/* Separador */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '18px 0 4px', width: '100%' }}>
+          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
+          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.05em' }}>o</span>
+          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
+        </div>
+
+        {/* Usuario / Contraseña */}
+        <form onSubmit={handlePassLogin} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+          <input
+            style={inp}
+            type="text"
+            placeholder="Usuario"
+            value={user}
+            onChange={e => setUser(e.target.value)}
+            autoComplete="username"
+          />
+          <input
+            style={inp}
+            type="password"
+            placeholder="Contraseña"
+            value={pass}
+            onChange={e => setPass(e.target.value)}
+            autoComplete="current-password"
+          />
+          {errPass && (
+            <p style={{ color: '#E53935', fontSize: '0.8rem', textAlign: 'center', margin: '0' }}>
+              {errPass}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={loadingPass || !user || !pass}
+            style={{
+              width: '100%',
+              padding: '11px',
+              borderRadius: 10,
+              border: 'none',
+              background: loadingPass ? 'rgba(192,92,62,0.6)' : 'var(--accent-terracotta)',
+              color: '#fff',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: loadingPass || !user || !pass ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit',
+              opacity: !user || !pass ? 0.5 : 1,
+              transition: 'opacity 0.2s',
+            }}
+          >
+            {loadingPass ? 'Verificando...' : 'Ingresar'}
+          </button>
+        </form>
+
+        <p className="login-footer" style={{ marginTop: 20 }}>OptiCore · Sistema de Gestión</p>
       </div>
     </div>
   );
