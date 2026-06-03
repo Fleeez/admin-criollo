@@ -155,7 +155,7 @@ export default function ConversationsTab({
               onClick={onMuteToggle}
               title={notifMuted ? 'Activar sonido' : 'Silenciar notificaciones'}
             >
-              <VolumeIcon size={14} />
+              <VolumeIcon size={16} />
             </button>
             <input
               type="range"
@@ -167,10 +167,10 @@ export default function ConversationsTab({
                 if (notifMuted && v > 0) onMuteToggle();
                 onVolumeChange(e.target.value);
               }}
-              title={`Volumen: ${Math.round((notifMuted ? 0 : notifVolume) * 100)}%`}
+              title={`Volumen notificaciones: ${Math.round((notifMuted ? 0 : notifVolume) * 100)}%`}
             />
             <span className="volume-pct">
-              {notifMuted ? '–' : `${Math.round(notifVolume * 100)}%`}
+              {notifMuted ? 'off' : `${Math.round(notifVolume * 100)}%`}
             </span>
           </div>
         </div>
