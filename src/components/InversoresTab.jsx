@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Users, ExternalLink, X, Save,
+  Users, ExternalLink, X, Save, Plus,
   Table2, Calendar, LayoutGrid,
   ChevronDown, ChevronRight, ChevronLeft,
   Search, MessageCircle, TrendingUp,
@@ -69,6 +69,110 @@ function isSameDay(d1, d2) {
 }
 function Field({ label, children }) {
   return <div style={{ display: 'flex', flexDirection: 'column' }}><label style={LABEL_STYLE}>{label}</label>{children}</div>;
+}
+
+// ── NuevoLeadModal ──────────────────────────────────────────
+
+function NuevoLeadModal({ onClose, onCreated, addToast }) {
+  const [form, setForm] = useState({
+    nombre: '', email: '', whatsapp: '', capital_disponible: '',
+    linkedin: '', zona_interes: '', experiencia_previa: '',
+    detalle_experiencia: '', origen_lead: '', estado_lead: 'Sin contactar',
+  });
+  const [saving, setSaving] = useState(false);
+  const set = (key) => (e) => setForm(prev => ({ ...prev, [key]: e.target.value }));
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const handleSave = async () => {
+    if (!form.nombre.trim()) { addToast('⚠️ El nombre es obligatorio'); return; }
+    if (!form.email.trim())  { addToast('⚠️ El email es obligatorio');  return; }
+    setSaving(true);
+    const { data, error } = await supabase.from('inversores').insert({
+      nombre:              form.nombre,
+      email:               form.email,
+      whatsapp:            form.whatsapp            || null,
+      capital_disponible:  form.capital_disponible  || null,
+      linkedin:            form.linkedin             || null,
+      zona_interes:        form.zona_interes         || null,
+      experiencia_previa:  form.experiencia_previa   || null,
+      detalle_experiencia: form.detalle_experiencia  || null,
+      origen_lead:         form.origen_lead          || null,
+      estado_lead:         form.estado_lead          || 'Sin contactar',
+    }).select().single();
+    setSaving(false);
+    if (error) { addToast('⚠️ Error al crear: ' + error.message); return; }
+    addToast('✓ Inversor creado');
+    onCreated(data);
+    onClose();
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1000, backgroundColor: 'rgba(30,28,26,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(2px)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--bg-secondary)', borderRadius: '20px', boxShadow: 'var(--shadow-lg)', width: '100%', maxWidth: '760px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 28px', borderBottom: '1px solid var(--border-color)', flexShrink: 0 }}>
+          <div style={{ fontFamily: 'var(--font-serif)', fontWeight: 700, fontSize: '18px', color: 'var(--text-primary)' }}>
+            Nuevo Inversor
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}><X size={20} /></button>
+        </div>
+
+        {/* Body */}
+        <div style={{ overflowY: 'auto', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+          <div>
+            <div style={{ ...SEC_TITLE, color: 'var(--accent-olive)' }}>Datos de contacto</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <Field label="Nombre completo *"><input style={INPUT_STYLE} value={form.nombre} onChange={set('nombre')} placeholder="Nombre y apellido" autoFocus /></Field>
+              <Field label="Email *"><input style={INPUT_STYLE} type="email" value={form.email} onChange={set('email')} placeholder="correo@ejemplo.com" /></Field>
+              <Field label="WhatsApp"><input style={INPUT_STYLE} value={form.whatsapp} onChange={set('whatsapp')} placeholder="+54 9 11..." /></Field>
+              <Field label="Capital Disponible"><input style={INPUT_STYLE} value={form.capital_disponible} onChange={set('capital_disponible')} placeholder="USD 100k - USD 200k" /></Field>
+            </div>
+          </div>
+          <div>
+            <div style={{ ...SEC_TITLE, color: 'var(--accent-olive)' }}>Perfil profesional</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <Field label="LinkedIn"><input style={INPUT_STYLE} value={form.linkedin} onChange={set('linkedin')} placeholder="https://linkedin.com/in/..." /></Field>
+              <Field label="Zona de Interés"><input style={INPUT_STYLE} value={form.zona_interes} onChange={set('zona_interes')} placeholder="CABA, GBA, Córdoba..." /></Field>
+              <Field label="Experiencia Previa">
+                <select style={INPUT_STYLE} value={form.experiencia_previa} onChange={set('experiencia_previa')}>
+                  <option value="">— Seleccioná —</option>
+                  <option value="Sí">Sí</option>
+                  <option value="No">No</option>
+                  <option value="Parcial">Parcial</option>
+                </select>
+              </Field>
+              <Field label="Origen Lead"><input style={INPUT_STYLE} value={form.origen_lead} onChange={set('origen_lead')} placeholder="Instagram, referido, evento..." /></Field>
+              <Field label="Detalle de experiencia" style={{ gridColumn: '1 / -1' }}>
+                <textarea style={{ ...INPUT_STYLE, minHeight: '72px', resize: 'vertical' }} value={form.detalle_experiencia} onChange={set('detalle_experiencia')} placeholder="Descripción de experiencia previa..." />
+              </Field>
+              <Field label="Etapa inicial (Pipeline)">
+                <select style={INPUT_STYLE} value={form.estado_lead} onChange={set('estado_lead')}>
+                  <option value="Sin contactar">Sin contactar</option>
+                  <option value="Contactado">Contactado</option>
+                  <option value="Reunión Agendada">Reunión Agendada</option>
+                  <option value="Finalizado">Finalizado</option>
+                  <option value="Cancelado">Cancelado</option>
+                </select>
+              </Field>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', padding: '16px 28px', borderTop: '1px solid var(--border-color)', flexShrink: 0, backgroundColor: 'var(--bg-primary)' }}>
+          <button onClick={onClose} style={{ padding: '9px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, border: '1px solid var(--border-color)', backgroundColor: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>Cancelar</button>
+          <button onClick={handleSave} disabled={saving} style={{ padding: '9px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, border: 'none', backgroundColor: 'var(--accent-terracotta)', color: '#fff', cursor: saving ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '7px', opacity: saving ? 0.7 : 1 }}>
+            <Plus size={14} />{saving ? 'Creando...' : 'Crear Inversor'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── LeadModal ───────────────────────────────────────────────
@@ -620,11 +724,12 @@ const VIEWS = [
 ];
 
 export default function InversoresTab({ addToast }) {
-  const [leads,        setLeads]        = useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [activeView,   setActiveView]   = useState('tabla');
-  const [selectedLead, setSelectedLead] = useState(null);
-  const [searchQuery,  setSearchQuery]  = useState('');
+  const [leads,          setLeads]          = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [activeView,     setActiveView]     = useState('tabla');
+  const [selectedLead,   setSelectedLead]   = useState(null);
+  const [searchQuery,    setSearchQuery]    = useState('');
+  const [showNuevoModal, setShowNuevoModal] = useState(false);
 
   useEffect(() => {
     supabase.from('inversores').select('*').is('deleted_at', null).order('created_at', { ascending: false })
@@ -737,13 +842,22 @@ export default function InversoresTab({ addToast }) {
         <div className="section-card">
           <div className="section-header">
             <h3 className="section-title">Leads de inversores</h3>
-            <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-              {loading
-                ? 'Cargando...'
-                : searchQuery.trim()
-                  ? `${filteredLeads.length} de ${leads.length} — click en fila para editar`
-                  : `${leads.length} registros — click en fila para editar`}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                {loading
+                  ? 'Cargando...'
+                  : searchQuery.trim()
+                    ? `${filteredLeads.length} de ${leads.length} — click en fila para editar`
+                    : `${leads.length} registros — click en fila para editar`}
+              </span>
+              <button
+                className="btn-primary"
+                onClick={() => setShowNuevoModal(true)}
+                style={{ fontSize: 13, padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
+              >
+                <Plus size={14} /> Nuevo Inversor
+              </button>
+            </div>
           </div>
 
           {/* Buscador */}
@@ -882,6 +996,15 @@ export default function InversoresTab({ addToast }) {
       {/* Modal de edición de lead */}
       {selectedLead && (
         <LeadModal lead={selectedLead} onClose={() => setSelectedLead(null)} onSaved={handleSaved} addToast={addToast} />
+      )}
+
+      {/* Modal de nuevo inversor */}
+      {showNuevoModal && (
+        <NuevoLeadModal
+          onClose={() => setShowNuevoModal(false)}
+          onCreated={(newLead) => setLeads(prev => [newLead, ...prev])}
+          addToast={addToast}
+        />
       )}
     </div>
   );
