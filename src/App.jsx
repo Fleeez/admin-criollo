@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { LayoutDashboard, MessageSquare, Calendar, Settings, AlertCircle, LogOut, Users, Moon, Sun, Bot } from 'lucide-react';
 import { supabase } from './lib/supabaseClient';
+import NotificationBell from './components/NotificationBell';
 import DashboardTab from './components/DashboardTab';
 import ConversationsTab from './components/ConversationsTab';
 import CalendarTab from './components/CalendarTab';
@@ -104,7 +105,14 @@ export default function App({ session }) {
   const [notifMuted, setNotifMuted]     = useState(() =>
     localStorage.getItem('criollo_notif_muted') === '1'
   );
-  const notifRef = useRef({ volume: 0.7, muted: false });
+  const [unreadConvIds, setUnreadConvIds] = useState(new Set());
+  const [notifications, setNotifications] = useState([]);
+  const notifRef          = useRef({ volume: 0.7, muted: false });
+  const conversationsRef  = useRef([]);
+  const selectedConvIdRef = useRef(null);
+
+  useEffect(() => { conversationsRef.current  = conversations;  }, [conversations]);
+  useEffect(() => { selectedConvIdRef.current = selectedConvId; }, [selectedConvId]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60000);
@@ -125,6 +133,13 @@ export default function App({ session }) {
       return !prev;
     });
   };
+
+  const addNotification = useCallback((type, title, body) => {
+    setNotifications(prev => [
+      { id: Date.now(), type, title, body, time: new Date(), read: false },
+      ...prev.slice(0, 49),
+    ]);
+  }, []);
 
   const toggleDarkMode = () => {
     setDarkMode(prev => {
@@ -187,6 +202,11 @@ export default function App({ session }) {
         const msg = payload.new;
         if (msg.origen === 'whatsapp') {
           playNotificationSound(notifRef.current.volume, notifRef.current.muted);
+          const conv = conversationsRef.current.find(c => c.phone === msg.telefono);
+          if (conv && conv.id !== selectedConvIdRef.current) {
+            setUnreadConvIds(prev => { const s = new Set(prev); s.add(conv.id); return s; });
+          }
+          addNotification('message', conv?.name || msg.telefono, msg.mensaje?.slice(0, 80));
         }
         setConversations(prev => prev.map(c => {
           if (c.phone !== msg.telefono) return c;
@@ -203,9 +223,22 @@ export default function App({ session }) {
     // ── Realtime: reservas ────────────────────────────────────────────────────
     const resChannel = supabase
       .channel('reservas-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservas' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservas' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const r = payload.new;
+          addNotification('reserva', 'Nueva reserva', `${r.nombre} — ${r.fecha} ${r.hora}`);
+        }
         supabase.from('reservas').select('*').order('fecha_iso', { ascending: true })
           .then(({ data: rows }) => setAppointments((rows || []).map(mapReserva)));
+      })
+      .subscribe();
+
+    // ── Realtime: inversores ──────────────────────────────────────────────────
+    const invChannel = supabase
+      .channel('inversores-live')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inversores' }, (payload) => {
+        const inv = payload.new;
+        addNotification('inversor', 'Nuevo lead inversor', inv.nombre || inv.whatsapp || '');
       })
       .subscribe();
 
@@ -213,6 +246,7 @@ export default function App({ session }) {
       supabase.removeChannel(convChannel);
       supabase.removeChannel(msgChannel);
       supabase.removeChannel(resChannel);
+      supabase.removeChannel(invChannel);
     };
   }, []);
 
@@ -220,6 +254,7 @@ export default function App({ session }) {
   const handleSelectConversation = async (convId) => {
     setSelectedConvId(convId);
     setActiveTab('conversaciones');
+    setUnreadConvIds(prev => { const s = new Set(prev); s.delete(convId); return s; });
 
     const conv = conversations.find(c => c.id === convId);
     if (!conv || conv.messages.length > 0) return; // ya cargados
@@ -351,6 +386,7 @@ export default function App({ session }) {
             notifMuted={notifMuted}
             onVolumeChange={handleVolumeChange}
             onMuteToggle={handleMuteToggle}
+            unreadConvIds={unreadConvIds}
           />
         );
       case 'reservas':
@@ -467,6 +503,10 @@ export default function App({ session }) {
             <span className="header-title">{getTabTitle()}</span>
           </div>
           <div className="header-status-bar">
+            <NotificationBell
+              notifications={notifications}
+              onMarkAllRead={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))}
+            />
             <button onClick={toggleDarkMode} title={darkMode ? 'Modo claro' : 'Modo oscuro'}
               style={{ background: 'none', border: '1px solid var(--border-color)', borderRadius: 8, cursor: 'pointer', padding: '6px 10px', display: 'flex', alignItems: 'center', color: 'var(--text-secondary)', marginRight: 8, transition: 'var(--transition-fast)' }}>
               {darkMode ? <Sun size={16} /> : <Moon size={16} />}

@@ -35,6 +35,7 @@ export default function ConversationsTab({
   notifMuted  = false,
   onVolumeChange,
   onMuteToggle,
+  unreadConvIds = new Set(),
 }) {
   const [searchQuery, setSearchQuery]   = useState('');
   const [messageText, setMessageText]   = useState('');
@@ -193,6 +194,7 @@ export default function ConversationsTab({
                   <div className="chat-item-details">
                     <div className="chat-item-top">
                       <span className="chat-item-name">{conv.name}</span>
+                      {unreadConvIds.has(conv.id) && <span className="unread-dot" title="Nuevo mensaje" />}
                       <span className="chat-item-time">{conv.timestamp}</span>
                     </div>
                     <div className="chat-item-bottom">
