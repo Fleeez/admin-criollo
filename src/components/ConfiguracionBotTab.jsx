@@ -67,7 +67,28 @@ export default function ConfiguracionBotTab({ addToast }) {
     }
 
     cargarConfig();
-    return () => { mounted = false; };
+
+    const channel = supabase
+      .channel('config-bot-live')
+      .on('postgres_changes', {
+        event:  'UPDATE',
+        schema: 'public',
+        table:  'configuracion_bot',
+        filter: `franquicia_id=eq.${FRANQUICIA_ID}`,
+      }, (payload) => {
+        if (!mounted) return;
+        const raw = payload.new;
+        if (Array.isArray(raw.lista_blanca_vip)) {
+          setListaVip(raw.lista_blanca_vip.map(entry =>
+            typeof entry === 'object' && entry !== null
+              ? { phone: String(entry.phone ?? ''), name: String(entry.name ?? 'VIP') }
+              : { phone: String(entry), name: 'VIP' }
+          ));
+        }
+      })
+      .subscribe();
+
+    return () => { mounted = false; supabase.removeChannel(channel); };
   }, [retryKey]);
 
   async function handleSave(e) {
