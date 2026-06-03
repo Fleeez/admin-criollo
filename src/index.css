@@ -1240,6 +1240,7 @@ input:checked + .slider:before { transform: translateX(20px); }
   font-family: var(--font-serif);
   font-size: 28px;
   font-weight: 700;
+  color: var(--accent-terracotta);
 }
 
 .calendar-year-title {
@@ -1328,11 +1329,11 @@ input:checked + .slider:before { transform: translateX(20px); }
 }
 
 .calendar-cell.today {
-  background-color: rgba(212, 163, 115, 0.05);
+  background-color: rgba(192, 92, 62, 0.06);
 }
 
 .calendar-cell.today .cell-number {
-  background-color: var(--accent-gold);
+  background-color: var(--accent-terracotta);
   color: white;
   width: 24px;
   height: 24px;
@@ -1928,7 +1929,7 @@ input:checked + .slider:before { transform: translateX(20px); }
   background: #231F1C;
   border-color: #3A3430;
 }
-[data-theme="dark"] .calendar-cell.today { background: rgba(192,92,62,0.12); }
+[data-theme="dark"] .calendar-cell.today { background: rgba(192,92,62,0.15); }
 [data-theme="dark"] .calendar-day-label { background: #1E1A17; color: var(--text-tertiary); }
 
 /* Chat dark mode */
