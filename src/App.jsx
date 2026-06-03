@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LayoutDashboard, MessageSquare, Calendar, Settings, AlertCircle, LogOut, Users, Moon, Sun, Bot } from 'lucide-react';
-import { loadData, saveData, STORAGE_KEYS } from './mockData';
 import { supabase } from './lib/supabaseClient';
 import DashboardTab from './components/DashboardTab';
 import ConversationsTab from './components/ConversationsTab';
@@ -11,6 +10,7 @@ import ChatDrawer from './components/ChatDrawer';
 import ConfiguracionBotTab from './components/ConfiguracionBotTab';
 import ErrorBoundary from './components/ErrorBoundary';
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function mapReserva(r) {
   const e = (r.estado ?? '').toLowerCase();
   const status = (e === 'cancelada' || e === 'cancelled' || e === 'canceled')
@@ -30,15 +30,51 @@ function mapReserva(r) {
   };
 }
 
+function formatRelative(isoStr) {
+  if (!isoStr) return '';
+  const diff = Date.now() - new Date(isoStr).getTime();
+  const min  = Math.floor(diff / 60000);
+  const hrs  = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (min < 2)   return 'ahora';
+  if (min < 60)  return `${min} min`;
+  if (hrs < 24)  return `${hrs} hora${hrs > 1 ? 's' : ''}`;
+  return `${days} día${days > 1 ? 's' : ''}`;
+}
+
+function mapConversation(row) {
+  return {
+    id:          row.id,
+    name:        row.name  || row.phone,
+    phone:       row.phone,
+    botActive:   row.bot_active !== false,
+    lastMessage: row.last_message || '',
+    timestamp:   formatRelative(row.updated_at),
+    messages:    [],
+  };
+}
+
+function mapMensaje(m) {
+  const senderMap = { whatsapp: 'client', bot: 'ai', humano: 'human' };
+  return {
+    id:     m.id,
+    sender: senderMap[m.origen] || 'client',
+    text:   m.mensaje,
+    time:   new Date(m.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+    date:   new Date(m.created_at).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }),
+  };
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
 export default function App({ session }) {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab]       = useState('dashboard');
   const [conversations, setConversations] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [selectedConvId, setSelectedConvId] = useState(null);
-  const [toasts, setToasts] = useState([]);
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('criollo_dark') === '1');
+  const [toasts, setToasts]             = useState([]);
+  const [darkMode, setDarkMode]         = useState(() => localStorage.getItem('criollo_dark') === '1');
   const [drawerConvId, setDrawerConvId] = useState(null);
-  const [now, setNow] = useState(new Date());
+  const [now, setNow]                   = useState(new Date());
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60000);
@@ -53,14 +89,27 @@ export default function App({ session }) {
     });
   };
 
-  // Load conversations from localStorage (demo data), appointments from Supabase
-  useEffect(() => {
-    const data = loadData();
-    setConversations(data.conversations);
-    if (data.conversations.length > 0) {
-      setSelectedConvId(data.conversations[0].id);
-    }
+  const addToast = (message) => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
+  };
 
+  // ── Cargar datos desde Supabase ───────────────────────────────────────────────
+  useEffect(() => {
+    // Conversations
+    supabase
+      .from('conversations')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) { console.error('[Panel] Error cargando conversaciones:', error); return; }
+        const mapped = (data || []).map(mapConversation);
+        setConversations(mapped);
+        if (mapped.length > 0 && !selectedConvId) setSelectedConvId(mapped[0].id);
+      });
+
+    // Reservas
     supabase
       .from('reservas')
       .select('*')
@@ -70,149 +119,146 @@ export default function App({ session }) {
         setAppointments((rows || []).map(mapReserva));
       });
 
-    const channel = supabase
+    // ── Realtime: conversations list ──────────────────────────────────────────
+    const convChannel = supabase
+      .channel('conversations-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setConversations(prev => [mapConversation(payload.new), ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          setConversations(prev => prev.map(c =>
+            c.id === payload.new.id
+              ? { ...c, botActive: payload.new.bot_active !== false, lastMessage: payload.new.last_message || c.lastMessage, timestamp: formatRelative(payload.new.updated_at) }
+              : c
+          ));
+        }
+      })
+      .subscribe();
+
+    // ── Realtime: new messages ────────────────────────────────────────────────
+    const msgChannel = supabase
+      .channel('mensajes-live')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, (payload) => {
+        const msg = payload.new;
+        setConversations(prev => prev.map(c => {
+          if (c.phone !== msg.telefono) return c;
+          return {
+            ...c,
+            messages:    [...(c.messages || []), mapMensaje(msg)],
+            lastMessage: msg.mensaje,
+            timestamp:   'ahora',
+          };
+        }));
+      })
+      .subscribe();
+
+    // ── Realtime: reservas ────────────────────────────────────────────────────
+    const resChannel = supabase
       .channel('reservas-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reservas' }, () => {
-        supabase
-          .from('reservas')
-          .select('*')
-          .order('fecha_iso', { ascending: true })
+        supabase.from('reservas').select('*').order('fecha_iso', { ascending: true })
           .then(({ data: rows }) => setAppointments((rows || []).map(mapReserva)));
       })
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
+    return () => {
+      supabase.removeChannel(convChannel);
+      supabase.removeChannel(msgChannel);
+      supabase.removeChannel(resChannel);
+    };
   }, []);
 
-  // Toast notification manager
-  const addToast = (message) => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, message }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 3000);
-  };
-
-  // Switch tabs and handle deep linking to chats
-  const handleSelectConversation = (convId) => {
+  // ── Seleccionar conversación: carga mensajes lazy ─────────────────────────────
+  const handleSelectConversation = async (convId) => {
     setSelectedConvId(convId);
     setActiveTab('conversaciones');
+
+    const conv = conversations.find(c => c.id === convId);
+    if (!conv || conv.messages.length > 0) return; // ya cargados
+
+    const { data, error } = await supabase
+      .from('mensajes')
+      .select('*')
+      .eq('telefono', conv.phone)
+      .order('created_at', { ascending: true });
+
+    if (error) { console.error('[Panel] Error cargando mensajes:', error); return; }
+    setConversations(prev => prev.map(c =>
+      c.id === convId ? { ...c, messages: (data || []).map(mapMensaje) } : c
+    ));
   };
 
-  // Toggle Bot Active status (supervised mode)
-  const handleToggleBot = (convId) => {
-    const updated = conversations.map(c => {
-      if (c.id === convId) {
-        const nextState = !c.botActive;
-        addToast(nextState ? '✓ Bruno reactivado para esta conversación' : '⏸ Bruno pausado (atención humana activa)');
-        return { ...c, botActive: nextState };
-      }
-      return c;
+  // ── Toggle Bruno activo ───────────────────────────────────────────────────────
+  const handleToggleBot = async (convId) => {
+    const conv = conversations.find(c => c.id === convId);
+    if (!conv) return;
+    const nextState = !conv.botActive;
+
+    // Optimistic update
+    setConversations(prev => prev.map(c => c.id === convId ? { ...c, botActive: nextState } : c));
+    addToast(nextState ? '✓ Bruno reactivado para esta conversación' : '⏸ Bruno pausado (atención humana activa)');
+
+    const { error } = await supabase
+      .from('conversations')
+      .update({ bot_active: nextState })
+      .eq('id', convId);
+
+    if (error) {
+      // Revert on error
+      setConversations(prev => prev.map(c => c.id === convId ? { ...c, botActive: !nextState } : c));
+      addToast('⚠️ Error al cambiar estado del bot');
+    }
+  };
+
+  // ── Enviar mensaje como humano ────────────────────────────────────────────────
+  const handleSendMessage = async (convId, text) => {
+    const conv = conversations.find(c => c.id === convId);
+    if (!conv || !text.trim()) return;
+
+    const timeStr = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+
+    // Optimistic update
+    const newMsg = { id: `opt_${Date.now()}`, sender: 'human', text, time: timeStr, date: 'Hoy' };
+    const wasBotActive = conv.botActive;
+    setConversations(prev => prev.map(c => {
+      if (c.id !== convId) return c;
+      return { ...c, botActive: false, lastMessage: text, timestamp: 'ahora', messages: [...(c.messages || []), newMsg] };
+    }));
+
+    if (wasBotActive) addToast('Intervención humana: Bruno pausado automáticamente');
+
+    // Insert en Supabase → el bot lo recibe via Realtime y lo envía por WhatsApp
+    const { error: msgErr } = await supabase.from('mensajes').insert({
+      telefono: conv.phone,
+      mensaje:  text,
+      origen:   'humano',
+      leido:    false,
     });
-    setConversations(updated);
-    saveData(STORAGE_KEYS.CONVERSATIONS, updated);
+    if (msgErr) addToast('⚠️ Error al enviar mensaje: ' + msgErr.message);
+
+    // Pausar bot en Supabase si estaba activo
+    if (wasBotActive) {
+      await supabase.from('conversations').update({ bot_active: false }).eq('id', convId);
+    }
   };
 
-  // Send message manually (Intervention)
-  const handleSendMessage = (convId, text) => {
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    const updated = conversations.map(c => {
-      if (c.id === convId) {
-        const newMsg = {
-          id: `m_h_${Date.now()}`,
-          sender: 'human',
-          text,
-          time: timeStr,
-          date: 'Hoy'
-        };
-        
-        // When sending manually, bot is automatically paused
-        const wasActive = c.botActive;
-        if (wasActive) {
-          addToast('Intervención humana: Bruno pausado automáticamente');
-        }
-
-        return {
-          ...c,
-          botActive: false,
-          lastMessage: text,
-          timestamp: 'ahora',
-          messages: [...c.messages, newMsg]
-        };
-      }
-      return c;
-    });
-
-    setConversations(updated);
-    saveData(STORAGE_KEYS.CONVERSATIONS, updated);
-
-    // Simulate customer replying back after 3 seconds
-    setTimeout(() => {
-      setConversations(currentConversations => {
-        const targetConv = currentConversations.find(c => c.id === convId);
-        if (!targetConv) return currentConversations;
-
-        // Formulate customer reply
-        let replyText = 'Perfecto, ¡gracias por responder!';
-        if (targetConv.name === 'Agustín') {
-          replyText = 'Buenísimo, entonces nos vemos a las 15:00. ¡Gracias!';
-        } else if (targetConv.name === 'María') {
-          replyText = 'Dale, confírmame si tienen mesa adentro o afuera por favor.';
-        } else if (targetConv.name.includes('Carlos')) {
-          replyText = 'Excelente, ¡hasta mañana!';
-        }
-
-        const customerMsg = {
-          id: `m_c_${Date.now()}`,
-          sender: 'client',
-          text: replyText,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          date: 'Hoy'
-        };
-
-        const finalConversations = currentConversations.map(c => {
-          if (c.id === convId) {
-            addToast(`NUEVO MENSAJE de ${c.name}`);
-            return {
-              ...c,
-              lastMessage: replyText,
-              timestamp: 'ahora',
-              messages: [...c.messages, customerMsg]
-            };
-          }
-          return c;
-        });
-
-        saveData(STORAGE_KEYS.CONVERSATIONS, finalConversations);
-        return finalConversations;
-      });
-    }, 3000);
-  };
-
-  // Create a new reservation
+  // ── Reservas ──────────────────────────────────────────────────────────────────
   const handleAddAppointment = async (data) => {
     const fechaIso = `${data.fecha}T${data.hora}:00`;
     const { error } = await supabase.from('reservas').insert({
-      nombre:         data.nombre,
-      telefono:       data.telefono || null,
-      fecha:          data.fecha,
-      hora:           data.hora,
-      personas:       Number(data.personas),
+      nombre: data.nombre, telefono: data.telefono || null,
+      fecha: data.fecha, hora: data.hora, personas: Number(data.personas),
       salon_exterior: data.salon_exterior || 'Salón',
-      estado:         data.estado || 'pendiente',
-      fecha_iso:      fechaIso,
+      estado: data.estado || 'pendiente', fecha_iso: fechaIso,
     });
     if (error) addToast('⚠️ Error al crear la reserva: ' + error.message);
     else       addToast('✓ Reserva creada');
   };
 
-  // Update fields of an existing reservation
   const handleUpdateAppointment = async (aptId, updates) => {
     const apt   = appointments.find(a => a.id === aptId);
-    const hora  = updates.hora  ?? apt?.time ?? '00:00';
-    const fecha = updates.fecha ?? apt?.date ?? '';
+    const hora  = updates.hora  ?? apt?.time  ?? '00:00';
+    const fecha = updates.fecha ?? apt?.date  ?? '';
     const payload = {
       ...(updates.nombre         !== undefined && { nombre:         updates.nombre }),
       ...(updates.telefono       !== undefined && { telefono:       updates.telefono }),
@@ -228,29 +274,19 @@ export default function App({ session }) {
     else       addToast('✓ Reserva actualizada');
   };
 
-  // Move appointment to a new date (drag & drop in CalendarTab)
   const handleMoveAppointment = async (aptId, newDate) => {
     const apt = appointments.find(a => a.id === aptId);
     if (!apt) return;
-    const hora = apt.time || '00:00';
-    const fechaIso = `${newDate}T${hora}:00`;
-
-    // Optimistic update
+    const fechaIso = `${newDate}T${apt.time || '00:00'}:00`;
     setAppointments(prev => prev.map(a => a.id === aptId ? { ...a, date: newDate } : a));
-
-    const { error } = await supabase
-      .from('reservas')
-      .update({ fecha: newDate, fecha_iso: fechaIso })
-      .eq('id', aptId);
-
+    const { error } = await supabase.from('reservas').update({ fecha: newDate, fecha_iso: fechaIso }).eq('id', aptId);
     if (error) {
       addToast('⚠️ No se pudo guardar. Ejecutá el SQL de permisos en Supabase.');
-      // Revert on failure
       setAppointments(prev => prev.map(a => a.id === aptId ? { ...a, date: apt.date } : a));
     }
   };
 
-  // Render correct tab view
+  // ── Render ────────────────────────────────────────────────────────────────────
   const renderTabContent = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -265,10 +301,10 @@ export default function App({ session }) {
         );
       case 'conversaciones':
         return (
-          <ConversationsTab 
+          <ConversationsTab
             conversations={conversations}
             selectedConvId={selectedConvId}
-            onSelectConversation={setSelectedConvId}
+            onSelectConversation={handleSelectConversation}
             onToggleBot={handleToggleBot}
             onSendMessage={handleSendMessage}
           />
@@ -297,19 +333,18 @@ export default function App({ session }) {
 
   const getTabTitle = () => {
     switch (activeTab) {
-      case 'dashboard': return 'Dashboard';
-      case 'conversaciones': return 'Supervisor de Conversaciones';
-      case 'reservas': return 'Reservas';
-      case 'configuracion-bot': return 'Panel de Administración';
-      case 'integraciones': return 'Integraciones de APIs';
-      case 'inversores': return 'Leads de Inversores';
-      default: return 'Gestión';
+      case 'dashboard':        return 'Dashboard';
+      case 'conversaciones':   return 'Supervisor de Conversaciones';
+      case 'reservas':         return 'Reservas';
+      case 'configuracion-bot':return 'Panel de Administración';
+      case 'integraciones':    return 'Integraciones de APIs';
+      case 'inversores':       return 'Leads de Inversores';
+      default:                 return 'Gestión';
     }
   };
 
   return (
     <div className="app-container" data-theme={darkMode ? 'dark' : 'light'}>
-      {/* Sidebar Navigation */}
       <aside className="sidebar">
         <div className="logo-section" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 0 }}>
           <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>
@@ -333,55 +368,30 @@ export default function App({ session }) {
 
         <ul className="nav-menu">
           <li className="nav-item">
-            <button 
-              className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`}
-              onClick={() => setActiveTab('dashboard')}
-            >
-              <LayoutDashboard className="nav-icon" />
-              <span>Dashboard</span>
+            <button className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
+              <LayoutDashboard className="nav-icon" /><span>Dashboard</span>
             </button>
           </li>
-
           <li className="nav-item">
-            <button 
-              className={`nav-link ${activeTab === 'conversaciones' ? 'active' : ''}`}
-              onClick={() => setActiveTab('conversaciones')}
-            >
-              <MessageSquare className="nav-icon" />
-              <span>Conversaciones</span>
+            <button className={`nav-link ${activeTab === 'conversaciones' ? 'active' : ''}`} onClick={() => setActiveTab('conversaciones')}>
+              <MessageSquare className="nav-icon" /><span>Conversaciones</span>
             </button>
           </li>
-
           <li className="nav-item">
-            <button
-              className={`nav-link ${activeTab === 'reservas' ? 'active' : ''}`}
-              onClick={() => setActiveTab('reservas')}
-            >
-              <Calendar className="nav-icon" />
-              <span>Reservas</span>
+            <button className={`nav-link ${activeTab === 'reservas' ? 'active' : ''}`} onClick={() => setActiveTab('reservas')}>
+              <Calendar className="nav-icon" /><span>Reservas</span>
             </button>
           </li>
-
           <li className="nav-item">
-            <button
-              className={`nav-link ${activeTab === 'inversores' ? 'active' : ''}`}
-              onClick={() => setActiveTab('inversores')}
-            >
-              <Users className="nav-icon" />
-              <span>Inversores</span>
+            <button className={`nav-link ${activeTab === 'inversores' ? 'active' : ''}`} onClick={() => setActiveTab('inversores')}>
+              <Users className="nav-icon" /><span>Inversores</span>
             </button>
           </li>
-
           <li className="nav-item">
-            <button
-              className={`nav-link ${activeTab === 'configuracion-bot' ? 'active' : ''}`}
-              onClick={() => setActiveTab('configuracion-bot')}
-            >
-              <Bot className="nav-icon" />
-              <span>Panel Admin</span>
+            <button className={`nav-link ${activeTab === 'configuracion-bot' ? 'active' : ''}`} onClick={() => setActiveTab('configuracion-bot')}>
+              <Bot className="nav-icon" /><span>Panel Admin</span>
             </button>
           </li>
-
         </ul>
 
         <div className="sidebar-footer">
@@ -397,43 +407,28 @@ export default function App({ session }) {
             </span>
             <span className="user-role">Dueño de Criollo</span>
           </div>
-          <button
-            className="signout-btn"
-            onClick={() => setActiveTab('integraciones')}
-            title="Integraciones"
-            style={{ color: activeTab === 'integraciones' ? 'var(--accent-terracotta)' : undefined }}
-          >
+          <button className="signout-btn" onClick={() => setActiveTab('integraciones')} title="Integraciones"
+            style={{ color: activeTab === 'integraciones' ? 'var(--accent-terracotta)' : undefined }}>
             <Settings size={16} />
           </button>
-          <button
-            className="signout-btn"
-            onClick={() => supabase.auth.signOut()}
-            title="Cerrar sesión"
-          >
+          <button className="signout-btn" onClick={() => supabase.auth.signOut()} title="Cerrar sesión">
             <LogOut size={16} />
           </button>
         </div>
       </aside>
 
-      {/* Main Panel Content */}
       <main className="main-content">
         <header className="app-header">
           <div className="header-title-section">
             <span className="header-title">{getTabTitle()}</span>
           </div>
-          
           <div className="header-status-bar">
-            <button
-              onClick={toggleDarkMode}
-              title={darkMode ? 'Modo claro' : 'Modo oscuro'}
-              style={{ background: 'none', border: '1px solid var(--border-color)', borderRadius: 8, cursor: 'pointer', padding: '6px 10px', display: 'flex', alignItems: 'center', color: 'var(--text-secondary)', marginRight: 8, transition: 'var(--transition-fast)' }}
-            >
+            <button onClick={toggleDarkMode} title={darkMode ? 'Modo claro' : 'Modo oscuro'}
+              style={{ background: 'none', border: '1px solid var(--border-color)', borderRadius: 8, cursor: 'pointer', padding: '6px 10px', display: 'flex', alignItems: 'center', color: 'var(--text-secondary)', marginRight: 8, transition: 'var(--transition-fast)' }}>
               {darkMode ? <Sun size={16} /> : <Moon size={16} />}
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>
-              <span style={{ textTransform: 'capitalize' }}>
-                {now.toLocaleDateString('es-AR', { weekday: 'short' }).replace('.', '')}
-              </span>
+              <span style={{ textTransform: 'capitalize' }}>{now.toLocaleDateString('es-AR', { weekday: 'short' }).replace('.', '')}</span>
               <span style={{ opacity: 0.3 }}>·</span>
               <span>{now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
               <span style={{ opacity: 0.3 }}>·</span>
@@ -451,7 +446,6 @@ export default function App({ session }) {
         </div>
       </main>
 
-      {/* Chat Quick Preview Drawer */}
       {drawerConvId && (() => {
         const drawerConv = conversations.find(c => c.id === drawerConvId);
         return drawerConv ? (
@@ -465,7 +459,6 @@ export default function App({ session }) {
         ) : null;
       })()}
 
-      {/* Toast Notification Container */}
       <div className="toast-container">
         {toasts.map(toast => (
           <div key={toast.id} className="toast">
