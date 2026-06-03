@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, X, ExternalLink, Calendar, Table2, UserX, Gift, Send, MessageSquare, Edit3, Plus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, X, ExternalLink, Calendar, Table2, UserX, Gift, Send, MessageSquare, Edit3, Plus, XCircle, Trash2, RotateCcw, Trash } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
 
 const INACTIVE_DAYS = 25;
 
@@ -334,8 +335,9 @@ function CalendarioView({ appointments, currentMonth, currentYear, setCurrentMon
 }
 
 // ─── Tabla View ───────────────────────────────────────────────
-function TablaView({ appointments, onSelectApt, onOpenForm }) {
+function TablaView({ appointments, onSelectApt, onOpenForm, onUpdateAppointment, onDeleteAppointment }) {
   const today = new Date().toISOString().split('T')[0];
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const sorted = [...appointments].sort((a, b) => {
     if (a.date !== b.date) return b.date.localeCompare(a.date);
     return (b.time || '').localeCompare(a.time || '');
@@ -393,7 +395,34 @@ function TablaView({ appointments, onSelectApt, onOpenForm }) {
                 </td>
                 <td><StatusBadge status={apt.status} /></td>
                 <td>
-                  <button className="btn-link" style={{ fontSize: 13 }} onClick={() => onSelectApt(apt)}>Ver</button>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <button className="btn-link" style={{ fontSize: 13 }} onClick={() => onSelectApt(apt)}>Ver</button>
+                    {apt.status !== 'cancelada' && (
+                      <button
+                        title="Cancelar reserva"
+                        onClick={() => onUpdateAppointment(apt.id, { estado: 'cancelada' })}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--status-paused-text)', padding: '2px 4px', display: 'flex', alignItems: 'center', borderRadius: 4 }}
+                      >
+                        <XCircle size={15} />
+                      </button>
+                    )}
+                    {confirmDelete === apt.id ? (
+                      <button
+                        onClick={() => { onDeleteAppointment(apt.id); setConfirmDelete(null); }}
+                        style={{ background: 'var(--accent-terracotta)', border: 'none', cursor: 'pointer', color: '#fff', padding: '2px 7px', fontSize: 11, fontWeight: 700, borderRadius: 4, whiteSpace: 'nowrap' }}
+                      >
+                        ¿Confirmar?
+                      </button>
+                    ) : (
+                      <button
+                        title="Enviar a papelera"
+                        onClick={() => setConfirmDelete(apt.id)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '2px 4px', display: 'flex', alignItems: 'center', borderRadius: 4 }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -512,8 +541,124 @@ function InactivosView({ appointments, addToast }) {
   );
 }
 
+// ─── Papelera View ────────────────────────────────────────────
+function PapeleraView({ onRestore, onDeleteForever, addToast }) {
+  const [items, setItems]       = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [confirmPerm, setConfirmPerm] = useState(null);
+
+  const cutoff15 = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
+
+  const load = () => {
+    setLoading(true);
+    supabase.from('reservas').select('*')
+      .not('deleted_at', 'is', null)
+      .gte('deleted_at', cutoff15)
+      .order('deleted_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) { addToast('⚠️ Error cargando papelera: ' + error.message); }
+        else setItems(data || []);
+        setLoading(false);
+      });
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const timeAgo = (iso) => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const min = Math.floor(diff / 60000);
+    const hrs = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    if (min < 2)  return 'ahora';
+    if (min < 60) return `${min} min`;
+    if (hrs < 24) return `${hrs} hora${hrs > 1 ? 's' : ''}`;
+    return `${days} día${days > 1 ? 's' : ''}`;
+  };
+
+  const handleRestore = async (id) => {
+    await onRestore(id);
+    setItems(prev => prev.filter(r => r.id !== id));
+  };
+
+  const handleDeleteForever = async (id) => {
+    const { error } = await supabase.from('reservas').delete().eq('id', id);
+    if (error) { addToast('⚠️ Error: ' + error.message); return; }
+    setItems(prev => prev.filter(r => r.id !== id));
+    setConfirmPerm(null);
+    addToast('🗑 Eliminado definitivamente');
+  };
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)' }}>Cargando papelera…</div>;
+
+  return (
+    <div>
+      <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: '8px 0 16px' }}>
+        Reservas eliminadas en los últimos 15 días. Podés restaurarlas o eliminarlas definitivamente.
+      </p>
+      <div className="data-table-wrapper">
+        {items.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)' }}>
+            <Trash size={28} style={{ opacity: 0.3, marginBottom: 8 }} />
+            <p>La papelera está vacía</p>
+          </div>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Fecha</th>
+                <th>Hora</th>
+                <th>Personas</th>
+                <th>Eliminada</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map(r => (
+                <tr key={r.id}>
+                  <td style={{ fontWeight: 600 }}>{r.nombre}</td>
+                  <td>{r.fecha ? r.fecha.split('-').reverse().join('/') : '—'}</td>
+                  <td style={{ color: 'var(--accent-terracotta)', fontWeight: 600 }}>{r.hora}</td>
+                  <td>{r.personas}</td>
+                  <td style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>hace {timeAgo(r.deleted_at)}</td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <button
+                        onClick={() => handleRestore(r.id)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: '1px solid var(--border-color)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'inherit' }}
+                      >
+                        <RotateCcw size={12} /> Restaurar
+                      </button>
+                      {confirmPerm === r.id ? (
+                        <button
+                          onClick={() => handleDeleteForever(r.id)}
+                          style={{ background: 'var(--accent-terracotta)', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#fff', fontFamily: 'inherit' }}
+                        >
+                          ¿Confirmar?
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmPerm(r.id)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '3px 4px', borderRadius: 4 }}
+                          title="Eliminar definitivamente"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────
-export default function CalendarTab({ appointments, onSelectConversation, onMoveAppointment, onAddAppointment, onUpdateAppointment, addToast }) {
+export default function CalendarTab({ appointments, onSelectConversation, onMoveAppointment, onAddAppointment, onUpdateAppointment, onDeleteAppointment, onRestoreAppointment, addToast }) {
   const [activeView,   setActiveView]   = useState('calendario');
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear,  setCurrentYear]  = useState(2026);
@@ -530,6 +675,7 @@ export default function CalendarTab({ appointments, onSelectConversation, onMove
     { id: 'calendario', label: 'Calendario', icon: <Calendar size={14} /> },
     { id: 'tabla',      label: 'Tabla',       icon: <Table2 size={14} /> },
     { id: 'inactivos',  label: 'Inactivos',   icon: <UserX size={14} /> },
+    { id: 'papelera',   label: 'Papelera',    icon: <Trash size={14} /> },
   ];
 
   const baseBtn = { borderRadius: 8, padding: '6px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 };
@@ -559,8 +705,22 @@ export default function CalendarTab({ appointments, onSelectConversation, onMove
           addToast={addToast}
         />
       )}
-      {activeView === 'tabla' && <TablaView appointments={appointments} onSelectApt={setSelectedApt} onOpenForm={setFormModal} />}
-      {activeView === 'inactivos'  && <InactivosView appointments={appointments} addToast={addToast} />}
+      {activeView === 'tabla' && (
+        <TablaView
+          appointments={appointments}
+          onSelectApt={setSelectedApt}
+          onOpenForm={setFormModal}
+          onUpdateAppointment={onUpdateAppointment}
+          onDeleteAppointment={onDeleteAppointment}
+        />
+      )}
+      {activeView === 'inactivos' && <InactivosView appointments={appointments} addToast={addToast} />}
+      {activeView === 'papelera'  && (
+        <PapeleraView
+          onRestore={onRestoreAppointment}
+          addToast={addToast}
+        />
+      )}
 
       {/* Appointment detail modal */}
       {selectedApt && (

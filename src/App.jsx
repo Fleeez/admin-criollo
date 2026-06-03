@@ -169,10 +169,11 @@ export default function App({ session }) {
         if (mapped.length > 0 && !selectedConvId) setSelectedConvId(mapped[0].id);
       });
 
-    // Reservas
+    // Reservas (excluye soft-deleted)
     supabase
       .from('reservas')
       .select('*')
+      .is('deleted_at', null)
       .order('fecha_iso', { ascending: true })
       .then(({ data: rows, error }) => {
         if (error) { console.error('[Panel] Error cargando reservas:', error); return; }
@@ -228,7 +229,7 @@ export default function App({ session }) {
           const r = payload.new;
           addNotification('reserva', 'Nueva reserva', `${r.nombre} — ${r.fecha} ${r.hora}`);
         }
-        supabase.from('reservas').select('*').order('fecha_iso', { ascending: true })
+        supabase.from('reservas').select('*').is('deleted_at', null).order('fecha_iso', { ascending: true })
           .then(({ data: rows }) => setAppointments((rows || []).map(mapReserva)));
       })
       .subscribe();
@@ -345,8 +346,39 @@ export default function App({ session }) {
       ...(fecha                               && { fecha_iso:       `${fecha}T${hora}:00` }),
     };
     const { error } = await supabase.from('reservas').update(payload).eq('id', aptId);
-    if (error) addToast('⚠️ Error al actualizar la reserva: ' + error.message);
-    else       addToast('✓ Reserva actualizada');
+    if (error) { addToast('⚠️ Error al actualizar la reserva: ' + error.message); return; }
+    setAppointments(prev => prev.map(a => {
+      if (a.id !== aptId) return a;
+      return {
+        ...a,
+        ...(updates.nombre         !== undefined && { name:          updates.nombre }),
+        ...(updates.telefono       !== undefined && { phone:         updates.telefono }),
+        ...(updates.fecha          !== undefined && { date:          updates.fecha }),
+        ...(updates.hora           !== undefined && { time:          updates.hora }),
+        ...(updates.personas       !== undefined && { guests:        Number(updates.personas) }),
+        ...(updates.salon_exterior !== undefined && { salon_exterior: updates.salon_exterior }),
+        ...(updates.estado         !== undefined && { status:        updates.estado }),
+      };
+    }));
+    addToast('✓ Reserva actualizada');
+  };
+
+  const handleDeleteAppointment = async (aptId) => {
+    const { error } = await supabase.from('reservas')
+      .update({ deleted_at: new Date().toISOString() }).eq('id', aptId);
+    if (error) { addToast('⚠️ Error al eliminar: ' + error.message); return; }
+    setAppointments(prev => prev.filter(a => a.id !== aptId));
+    addToast('🗑 Reserva enviada a la papelera');
+  };
+
+  const handleRestoreAppointment = async (aptId) => {
+    const { error } = await supabase.from('reservas')
+      .update({ deleted_at: null }).eq('id', aptId);
+    if (error) { addToast('⚠️ Error al restaurar: ' + error.message); return; }
+    addToast('✓ Reserva restaurada');
+    supabase.from('reservas').select('*').is('deleted_at', null)
+      .order('fecha_iso', { ascending: true })
+      .then(({ data }) => setAppointments((data || []).map(mapReserva)));
   };
 
   const handleMoveAppointment = async (aptId, newDate) => {
@@ -397,6 +429,8 @@ export default function App({ session }) {
             onMoveAppointment={handleMoveAppointment}
             onAddAppointment={handleAddAppointment}
             onUpdateAppointment={handleUpdateAppointment}
+            onDeleteAppointment={handleDeleteAppointment}
+            onRestoreAppointment={handleRestoreAppointment}
             addToast={addToast}
           />
         );

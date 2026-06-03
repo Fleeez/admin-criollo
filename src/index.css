@@ -1450,6 +1450,7 @@ input:checked + .slider:before { transform: translateX(20px); }
   font-family: var(--font-serif);
   font-size: 20px;
   font-weight: 700;
+  color: var(--text-primary);
 }
 
 .btn-close {
