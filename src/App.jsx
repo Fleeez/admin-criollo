@@ -10,6 +10,29 @@ import ChatDrawer from './components/ChatDrawer';
 import ConfiguracionBotTab from './components/ConfiguracionBotTab';
 import ErrorBoundary from './components/ErrorBoundary';
 
+// ── Notification sound (Web Audio API — no external files) ───────────────────
+function playNotificationSound(volume, muted) {
+  if (muted || volume <= 0) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const playTone = (freq, t0, dur) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(volume * 0.22, t0);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.start(t0);
+      osc.stop(t0 + dur);
+    };
+    playTone(800,  ctx.currentTime,        0.18);
+    playTone(1100, ctx.currentTime + 0.12, 0.30);
+    setTimeout(() => ctx.close(), 700);
+  } catch (_) {}
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function mapReserva(r) {
   const e = (r.estado ?? '').toLowerCase();
@@ -75,11 +98,33 @@ export default function App({ session }) {
   const [darkMode, setDarkMode]         = useState(() => localStorage.getItem('criollo_dark') === '1');
   const [drawerConvId, setDrawerConvId] = useState(null);
   const [now, setNow]                   = useState(new Date());
+  const [notifVolume, setNotifVolume]   = useState(() =>
+    parseFloat(localStorage.getItem('criollo_notif_volume') ?? '0.7')
+  );
+  const [notifMuted, setNotifMuted]     = useState(() =>
+    localStorage.getItem('criollo_notif_muted') === '1'
+  );
+  const notifRef = useRef({ volume: 0.7, muted: false });
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => { notifRef.current.volume = notifVolume; }, [notifVolume]);
+  useEffect(() => { notifRef.current.muted  = notifMuted;  }, [notifMuted]);
+
+  const handleVolumeChange = (val) => {
+    const v = parseFloat(val);
+    setNotifVolume(v);
+    localStorage.setItem('criollo_notif_volume', String(v));
+  };
+  const handleMuteToggle = () => {
+    setNotifMuted(prev => {
+      localStorage.setItem('criollo_notif_muted', !prev ? '1' : '0');
+      return !prev;
+    });
+  };
 
   const toggleDarkMode = () => {
     setDarkMode(prev => {
@@ -140,6 +185,9 @@ export default function App({ session }) {
       .channel('mensajes-live')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, (payload) => {
         const msg = payload.new;
+        if (msg.origen === 'whatsapp') {
+          playNotificationSound(notifRef.current.volume, notifRef.current.muted);
+        }
         setConversations(prev => prev.map(c => {
           if (c.phone !== msg.telefono) return c;
           return {
@@ -299,6 +347,10 @@ export default function App({ session }) {
             onSelectConversation={handleSelectConversation}
             onToggleBot={handleToggleBot}
             onSendMessage={handleSendMessage}
+            notifVolume={notifVolume}
+            notifMuted={notifMuted}
+            onVolumeChange={handleVolumeChange}
+            onMuteToggle={handleMuteToggle}
           />
         );
       case 'reservas':

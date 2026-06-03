@@ -575,6 +575,39 @@ button, input, select, textarea {
   line-height: 1;
 }
 
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 4px;
+}
+.volume-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: var(--transition-fast);
+}
+.volume-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
+.volume-btn.muted { color: var(--accent-terracotta); }
+.volume-slider {
+  flex: 1;
+  accent-color: var(--accent-terracotta);
+  cursor: pointer;
+  height: 4px;
+}
+.volume-pct {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  min-width: 28px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .search-input-wrapper {
   position: relative;
   display: flex;

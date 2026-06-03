@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, Send, MessageSquare, ArrowLeft, Bot, User } from 'lucide-react';
+import { Search, Send, MessageSquare, ArrowLeft, Bot, User, Volume2, Volume1, VolumeX } from 'lucide-react';
 
 // Deterministic gradient per contact name
 function getAvatarGradient(name = '') {
@@ -30,7 +30,11 @@ export default function ConversationsTab({
   selectedConvId,
   onSelectConversation,
   onToggleBot,
-  onSendMessage
+  onSendMessage,
+  notifVolume = 0.7,
+  notifMuted  = false,
+  onVolumeChange,
+  onMuteToggle,
 }) {
   const [searchQuery, setSearchQuery]   = useState('');
   const [messageText, setMessageText]   = useState('');
@@ -39,6 +43,10 @@ export default function ConversationsTab({
 
   const messagesEndRef = useRef(null);
   const textareaRef    = useRef(null);
+
+  const VolumeIcon = notifMuted || notifVolume === 0
+    ? VolumeX
+    : notifVolume < 0.5 ? Volume1 : Volume2;
 
   const selectedConv = conversations.find(c => c.id === selectedConvId) || conversations[0];
 
@@ -137,6 +145,33 @@ export default function ConversationsTab({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+          </div>
+
+          {/* Volume / notification control */}
+          <div className="volume-control">
+            <button
+              type="button"
+              className={`volume-btn ${notifMuted ? 'muted' : ''}`}
+              onClick={onMuteToggle}
+              title={notifMuted ? 'Activar sonido' : 'Silenciar notificaciones'}
+            >
+              <VolumeIcon size={14} />
+            </button>
+            <input
+              type="range"
+              className="volume-slider"
+              min="0" max="1" step="0.05"
+              value={notifMuted ? 0 : notifVolume}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (notifMuted && v > 0) onMuteToggle();
+                onVolumeChange(e.target.value);
+              }}
+              title={`Volumen: ${Math.round((notifMuted ? 0 : notifVolume) * 100)}%`}
+            />
+            <span className="volume-pct">
+              {notifMuted ? '–' : `${Math.round(notifVolume * 100)}%`}
+            </span>
           </div>
         </div>
 
