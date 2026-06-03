@@ -7,18 +7,8 @@ import LoginPage from './pages/LoginPage.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import { supabase } from './lib/supabaseClient.js'
 
-const ADMIN_FAKE_SESSION = {
-  user: {
-    email: 'admin@criollo.admin',
-    user_metadata: { full_name: 'Admin Criollo' }
-  }
-};
-
 function Root() {
-  const [session,      setSession]      = useState(undefined)
-  const [adminBypass,  setAdminBypass]  = useState(
-    () => localStorage.getItem('criollo_admin_bypass') === '1'
-  )
+  const [session, setSession] = useState(undefined)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -27,24 +17,10 @@ function Root() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
-      if (_event === 'SIGNED_OUT') {
-        setAdminBypass(false)
-        localStorage.removeItem('criollo_admin_bypass')
-      }
     })
 
     return () => subscription.unsubscribe()
   }, [])
-
-  const handleBypassLogin = () => {
-    localStorage.setItem('criollo_admin_bypass', '1')
-    setAdminBypass(true)
-  }
-
-  // Prioridad: sesión real de Supabase > bypass admin > estado de Supabase (null/undefined)
-  const effectiveSession = (session !== undefined && session !== null)
-    ? session
-    : adminBypass ? ADMIN_FAKE_SESSION : session
 
   return (
     <BrowserRouter>
@@ -52,18 +28,18 @@ function Root() {
         <Route
           path="/login"
           element={
-            effectiveSession === undefined
+            session === undefined
               ? <div className="loading-screen" />
-              : effectiveSession
+              : session
                 ? <Navigate to="/" replace />
-                : <LoginPage onBypassLogin={handleBypassLogin} />
+                : <LoginPage />
           }
         />
         <Route
           path="/*"
           element={
-            <ProtectedRoute session={effectiveSession}>
-              <App session={effectiveSession} />
+            <ProtectedRoute session={session}>
+              <App session={session} />
             </ProtectedRoute>
           }
         />

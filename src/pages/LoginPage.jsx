@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
-export default function LoginPage({ onBypassLogin }) {
+export default function LoginPage() {
   const [loading,     setLoading]     = useState(false);
   const [error,       setError]       = useState(null);
   const [user,        setUser]        = useState('');
@@ -22,19 +22,50 @@ export default function LoginPage({ onBypassLogin }) {
     }
   }
 
-  function handlePassLogin(e) {
+  async function handlePassLogin(e) {
     e.preventDefault();
-    setErrPass(null);
-    setLoadingPass(true);
+    if (!user.trim() || !pass.trim()) return;
 
-    setTimeout(() => {
-      if (user.trim() === 'criolloadmin' && pass === 'criolloadmin2026') {
-        onBypassLogin?.();
-      } else {
-        setErrPass('Usuario o contraseña incorrectos');
-      }
+    if (user.trim() !== 'criolloadmin' || pass !== 'criolloadmin2026') {
+      setErrPass('Usuario o contraseña incorrectos');
+      return;
+    }
+
+    setLoadingPass(true);
+    setErrPass(null);
+
+    const { error: signInErr } = await supabase.auth.signInWithPassword({
+      email: 'criolloadmin@criollo.admin',
+      password: 'criolloadmin2026',
+    });
+
+    if (!signInErr) {
       setLoadingPass(false);
-    }, 400);
+      return; // onAuthStateChange en main.jsx redirige automáticamente
+    }
+
+    // Usuario no existe aún — intentar crearlo automáticamente
+    if (signInErr.message.toLowerCase().includes('invalid login credentials') ||
+        signInErr.message.toLowerCase().includes('email not confirmed')) {
+      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+        email: 'criolloadmin@criollo.admin',
+        password: 'criolloadmin2026',
+      });
+
+      if (!signUpErr && signUpData?.session) {
+        setLoadingPass(false);
+        return;
+      }
+
+      setErrPass(
+        'Necesitás crear el usuario en Supabase Dashboard: ' +
+        'Authentication → Users → Add user → Email: criolloadmin@criollo.admin, ' +
+        'Password: criolloadmin2026, ✓ Auto confirm user'
+      );
+    } else {
+      setErrPass('Error: ' + signInErr.message);
+    }
+    setLoadingPass(false);
   }
 
   const inp = {
@@ -106,7 +137,7 @@ export default function LoginPage({ onBypassLogin }) {
             autoComplete="current-password"
           />
           {errPass && (
-            <p style={{ color: '#E53935', fontSize: '0.8rem', textAlign: 'center', margin: '0' }}>
+            <p style={{ color: '#E53935', fontSize: '0.75rem', textAlign: 'left', margin: 0, lineHeight: 1.4 }}>
               {errPass}
             </p>
           )}
@@ -118,7 +149,7 @@ export default function LoginPage({ onBypassLogin }) {
               padding: '11px',
               borderRadius: 10,
               border: 'none',
-              background: loadingPass ? 'rgba(192,92,62,0.6)' : 'var(--accent-terracotta)',
+              background: 'var(--accent-terracotta)',
               color: '#fff',
               fontSize: 14,
               fontWeight: 600,
