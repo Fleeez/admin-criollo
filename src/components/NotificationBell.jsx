@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, MessageSquare, Calendar, Users } from 'lucide-react';
+import { Bell, MessageSquare, Calendar, Users, X } from 'lucide-react';
 
 function timeAgo(date) {
   const diff = Date.now() - new Date(date).getTime();
@@ -23,7 +23,7 @@ const TYPE_LABELS = {
   inversor: 'Inversor',
 };
 
-export default function NotificationBell({ notifications, onMarkAllRead }) {
+export default function NotificationBell({ notifications, onMarkAllRead, onDelete, onNavigate }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
 
@@ -36,6 +36,11 @@ export default function NotificationBell({ notifications, onMarkAllRead }) {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  const handleItemClick = (n) => {
+    onNavigate?.(n.type, n.convId);
+    setOpen(false);
+  };
 
   return (
     <div className="notif-bell-wrap" ref={wrapRef}>
@@ -55,7 +60,7 @@ export default function NotificationBell({ notifications, onMarkAllRead }) {
           <div className="notif-dropdown-header">
             <span className="notif-dropdown-title">Novedades</span>
             {unreadCount > 0 && (
-              <button className="notif-mark-read" onClick={() => { onMarkAllRead(); }}>
+              <button className="notif-mark-read" onClick={onMarkAllRead}>
                 Marcar todo leído
               </button>
             )}
@@ -67,24 +72,40 @@ export default function NotificationBell({ notifications, onMarkAllRead }) {
               <p>Sin novedades aún</p>
             </div>
           ) : (
-            <ul className="notif-list">
-              {notifications.slice(0, 15).map(n => {
-                const Icon = TYPE_ICONS[n.type] || Bell;
-                return (
-                  <li key={n.id} className={`notif-item ${n.read ? '' : 'unread'}`}>
-                    <div className={`notif-item-icon notif-icon-${n.type}`}>
-                      <Icon size={13} />
-                    </div>
-                    <div className="notif-item-body">
-                      <span className="notif-item-label">{TYPE_LABELS[n.type] || n.type}</span>
-                      <span className="notif-item-title">{n.title}</span>
-                      {n.body && <span className="notif-item-text">{n.body}</span>}
-                    </div>
-                    <span className="notif-item-time">{timeAgo(n.time)}</span>
-                  </li>
-                );
-              })}
-            </ul>
+            <>
+              <ul className="notif-list">
+                {notifications.map(n => {
+                  const Icon = TYPE_ICONS[n.type] || Bell;
+                  return (
+                    <li key={n.id} className={`notif-item ${n.read ? '' : 'unread'}`}>
+                      <button className="notif-item-btn" onClick={() => handleItemClick(n)}>
+                        <div className={`notif-item-icon notif-icon-${n.type}`}>
+                          <Icon size={13} />
+                        </div>
+                        <div className="notif-item-body">
+                          <span className="notif-item-label">{TYPE_LABELS[n.type] || n.type}</span>
+                          <span className="notif-item-title">{n.title}</span>
+                          {n.body && <span className="notif-item-text">{n.body}</span>}
+                        </div>
+                        <span className="notif-item-time">{timeAgo(n.time)}</span>
+                      </button>
+                      <button
+                        className="notif-item-delete"
+                        onClick={(e) => { e.stopPropagation(); onDelete?.(n.id); }}
+                        title="Eliminar"
+                      >
+                        <X size={11} />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              {notifications.length > 4 && (
+                <div className="notif-more-badge">
+                  +{notifications.length - 4} más abajo
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

@@ -725,6 +725,13 @@ button, input, select, textarea {
   margin-bottom: 4px;
 }
 
+.chat-item-name-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
 .chat-item-name {
   font-size: 14px;
   font-weight: 600;
@@ -732,7 +739,7 @@ button, input, select, textarea {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 140px;
+  max-width: 130px;
 }
 
 .chat-item-time {
@@ -1982,9 +1989,6 @@ input:checked + .slider:before { transform: translateX(20px); }
 }
 
 /* ── Unread dot ───────────────────────────────────────────────────────────── */
-.chat-item-top {
-  position: relative;
-}
 .unread-dot {
   display: inline-block;
   width: 8px;
@@ -2073,20 +2077,56 @@ input:checked + .slider:before { transform: translateX(20px); }
 .notif-mark-read:hover { opacity: 0.7; }
 .notif-list {
   list-style: none;
-  max-height: 360px;
+  max-height: 244px;
   overflow-y: auto;
 }
 .notif-item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 11px 18px;
+  gap: 0;
+  padding: 0;
   border-bottom: 1px solid var(--border-color);
   transition: background var(--transition-fast);
 }
 .notif-item:last-child { border-bottom: none; }
 .notif-item.unread { background: rgba(192, 92, 62, 0.04); }
 .notif-item:hover { background: var(--bg-primary); }
+.notif-item-btn {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 0 11px 18px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+}
+.notif-item-btn:hover .notif-item-title { color: var(--accent-terracotta); }
+.notif-item-delete {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  padding: 11px 12px 11px 4px;
+  display: flex;
+  align-items: flex-start;
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.notif-item:hover .notif-item-delete { opacity: 1; }
+.notif-item-delete:hover { color: var(--accent-terracotta); }
+.notif-more-badge {
+  padding: 7px 18px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  border-top: 1px solid var(--border-color);
+  text-align: center;
+  background: var(--bg-secondary);
+}
 .notif-item-icon {
   width: 28px;
   height: 28px;

@@ -134,9 +134,9 @@ export default function App({ session }) {
     });
   };
 
-  const addNotification = useCallback((type, title, body) => {
+  const addNotification = useCallback((type, title, body, convId = null) => {
     setNotifications(prev => [
-      { id: Date.now(), type, title, body, time: new Date(), read: false },
+      { id: Date.now(), type, title, body, convId, time: new Date(), read: false },
       ...prev.slice(0, 49),
     ]);
   }, []);
@@ -206,7 +206,7 @@ export default function App({ session }) {
           if (conv && conv.id !== selectedConvIdRef.current) {
             setUnreadConvIds(prev => { const s = new Set(prev); s.add(conv.id); return s; });
           }
-          addNotification('message', conv?.name || msg.telefono, msg.mensaje?.slice(0, 80));
+          addNotification('message', conv?.name || msg.telefono, msg.mensaje?.slice(0, 80), conv?.id);
         }
         setConversations(prev => prev.map(c => {
           if (c.phone !== msg.telefono) return c;
@@ -506,6 +506,12 @@ export default function App({ session }) {
             <NotificationBell
               notifications={notifications}
               onMarkAllRead={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))}
+              onDelete={(id) => setNotifications(prev => prev.filter(n => n.id !== id))}
+              onNavigate={(type, convId) => {
+                if (type === 'message' && convId) handleSelectConversation(convId);
+                else if (type === 'reserva')  setActiveTab('reservas');
+                else if (type === 'inversor') setActiveTab('inversores');
+              }}
             />
             <button onClick={toggleDarkMode} title={darkMode ? 'Modo claro' : 'Modo oscuro'}
               style={{ background: 'none', border: '1px solid var(--border-color)', borderRadius: 8, cursor: 'pointer', padding: '6px 10px', display: 'flex', alignItems: 'center', color: 'var(--text-secondary)', marginRight: 8, transition: 'var(--transition-fast)' }}>

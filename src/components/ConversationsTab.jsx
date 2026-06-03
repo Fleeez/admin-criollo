@@ -193,8 +193,10 @@ export default function ConversationsTab({
                   </div>
                   <div className="chat-item-details">
                     <div className="chat-item-top">
-                      <span className="chat-item-name">{conv.name}</span>
-                      {unreadConvIds.has(conv.id) && <span className="unread-dot" title="Nuevo mensaje" />}
+                      <div className="chat-item-name-row">
+                        <span className="chat-item-name">{conv.name}</span>
+                        {unreadConvIds.has(conv.id) && <span className="unread-dot" title="Nuevo mensaje" />}
+                      </div>
                       <span className="chat-item-time">{conv.timestamp}</span>
                     </div>
                     <div className="chat-item-bottom">
