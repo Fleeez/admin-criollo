@@ -128,7 +128,7 @@ export default function App({ session }) {
         } else if (payload.eventType === 'UPDATE') {
           setConversations(prev => prev.map(c =>
             c.id === payload.new.id
-              ? { ...c, botActive: payload.new.bot_active !== false, lastMessage: payload.new.last_message || c.lastMessage, timestamp: formatRelative(payload.new.updated_at) }
+              ? { ...c, name: payload.new.name || c.name, botActive: payload.new.bot_active !== false, lastMessage: payload.new.last_message || c.lastMessage, timestamp: formatRelative(payload.new.updated_at) }
               : c
           ));
         }
@@ -215,15 +215,7 @@ export default function App({ session }) {
     const conv = conversations.find(c => c.id === convId);
     if (!conv || !text.trim()) return;
 
-    const timeStr = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-
-    // Optimistic update
-    const newMsg = { id: `opt_${Date.now()}`, sender: 'human', text, time: timeStr, date: 'Hoy' };
     const wasBotActive = conv.botActive;
-    setConversations(prev => prev.map(c => {
-      if (c.id !== convId) return c;
-      return { ...c, botActive: false, lastMessage: text, timestamp: 'ahora', messages: [...(c.messages || []), newMsg] };
-    }));
 
     if (wasBotActive) addToast('Intervención humana: Bruno pausado automáticamente');
 
