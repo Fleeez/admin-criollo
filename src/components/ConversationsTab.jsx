@@ -187,12 +187,14 @@ export default function ConversationsTab({
           {/* Header */}
           <div className="chat-window-header">
             <div className="chat-window-user-info">
-              <button
-                onClick={() => setMobileView('list')}
-                className="btn-back-mobile"
-              >
-                <ArrowLeft size={20} />
-              </button>
+              {mobileView === 'chat' && (
+                <button
+                  onClick={() => setMobileView('list')}
+                  className="btn-back-mobile"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+              )}
               <div
                 className="chat-window-avatar"
                 style={{ background: getAvatarGradient(selectedConv.name) }}
@@ -213,7 +215,7 @@ export default function ConversationsTab({
 
             <div className="bot-toggle-wrapper">
               <span className="bot-toggle-label">
-                {selectedConv.botActive ? 'Bot ON' : 'Bot OFF'}
+                {selectedConv.botActive ? 'Bruno Activo' : 'Bruno Pausado'}
               </span>
               <label className="switch">
                 <input
