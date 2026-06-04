@@ -2212,3 +2212,169 @@ input:checked + .slider:before { transform: translateX(20px); }
 [data-theme="dark"] .notif-icon-message { background: rgba(79, 109, 122, 0.2); }
 [data-theme="dark"] .notif-icon-reserva  { background: rgba(212, 163, 115, 0.15); }
 [data-theme="dark"] .notif-icon-inversor { background: rgba(192, 92, 62, 0.15); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — Android & iOS
+   Puramente aditivo: solo afecta a ≤768px, el desktop no cambia.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Hamburger button (oculto en desktop) ──────────────────────── */
+.sidebar-hamburger-btn {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  margin-right: 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.sidebar-hamburger-btn span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--text-primary);
+  border-radius: 2px;
+  transition: background 0.15s;
+}
+.sidebar-hamburger-btn:hover span { background: var(--accent-terracotta); }
+
+/* ── Overlay oscuro detrás del sidebar ──────────────────────────── */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 99;
+  backdrop-filter: blur(2px);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Breakpoint 768px — tablets y teléfonos grandes
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+  /* Hamburger visible */
+  .sidebar-hamburger-btn { display: flex; }
+
+  /* Sidebar: desliza desde la izquierda */
+  .sidebar {
+    transform: translateX(-100%) !important;
+    transition: transform 0.25s ease !important;
+    z-index: 100 !important;
+    width: 280px !important;
+  }
+  .sidebar.sidebar-open { transform: translateX(0) !important; }
+
+  /* Main content: ocupa toda la pantalla */
+  .main-content { margin-left: 0 !important; }
+
+  /* Header */
+  .app-header {
+    padding: 0 14px !important;
+    height: 56px !important;
+  }
+  .header-title-section { gap: 0; }
+  .header-title { font-size: 17px; }
+  .header-status-bar { gap: 6px; }
+
+  /* Ocultar la fecha/hora en mobile (demasiado para la barra) */
+  .header-status-bar > div:last-child { display: none; }
+
+  /* View container */
+  .view-container { padding: 14px 12px !important; }
+
+  /* Modales */
+  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal-content {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 20px 16px !important;
+    border-radius: 14px 14px 0 0 !important;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  /* Login */
+  .login-card { padding: 28px 20px !important; max-width: 100% !important; }
+
+  /* Stats */
+  .stat-value { font-size: 26px !important; }
+  .stat-card  { padding: 14px 12px !important; }
+
+  /* Touch targets mínimo 44px */
+  .btn-icon-sm {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    padding: 12px !important;
+    justify-content: center;
+  }
+  .volume-btn {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    padding: 10px !important;
+  }
+  .notif-bell-btn {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    padding: 10px 12px !important;
+  }
+  .btn-sm-ghost { padding: 10px 14px !important; }
+
+  /* Chat */
+  .chat-tab-container { height: calc(100vh - 56px) !important; }
+  .chat-window-header { padding: 10px 12px !important; gap: 6px; }
+  .chat-list-header   { padding: 12px 12px 0 !important; }
+  .chat-list-title    { font-size: 15px; }
+
+  /* Configuración */
+  .form-section { padding: 18px 14px !important; }
+  .form-group   { margin-bottom: 14px; }
+
+  /* Tabs horizontales con scroll */
+  .section-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .section-tabs::-webkit-scrollbar { display: none; }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Breakpoint 480px — teléfonos pequeños
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+
+  /* Tipografía */
+  .header-title  { font-size: 15px; }
+  .stat-value    { font-size: 20px !important; }
+  .view-title    { font-size: 17px; }
+
+  /* Stats grid: 2 columnas */
+  .stats-grid { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+  .stat-card  { padding: 12px 10px !important; }
+
+  /* Inputs en 1 columna */
+  .input-grid { grid-template-columns: 1fr !important; }
+
+  /* Botones primarios full-width en formularios */
+  .form-section .btn-primary {
+    width: 100% !important;
+    justify-content: center;
+  }
+
+  /* Login */
+  .login-card { padding: 20px 14px !important; }
+
+  /* Chat header: ocultar texto del toggle para ahorrar espacio */
+  .bot-toggle-label { display: none !important; }
+  .chat-window-name { font-size: 13px; }
+  .chat-window-phone { font-size: 11px; }
+
+  /* Papelera: acciones en columna */
+  .papelera-item-actions { flex-direction: column; gap: 6px; }
+
+  /* View padding mínimo */
+  .view-container { padding: 10px 10px !important; }
+}

@@ -111,6 +111,7 @@ export default function App({ session }) {
   const [notifications, setNotifications]     = useState([]);
   const [trashConversations, setTrashConversations] = useState([]);
   const [showPapelera, setShowPapelera]       = useState(false);
+  const [sidebarOpen, setSidebarOpen]         = useState(false);
   const notifRef          = useRef({ volume: 0.7, muted: false });
   const conversationsRef  = useRef([]);
   const selectedConvIdRef = useRef(null);
@@ -579,9 +580,12 @@ export default function App({ session }) {
     }
   };
 
+  const navTo = (tab) => { setActiveTab(tab); setSidebarOpen(false); };
+
   return (
     <div className="app-container" data-theme={darkMode ? 'dark' : 'light'}>
-      <aside className="sidebar">
+      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+      <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
         <div className="logo-section" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 0 }}>
           <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>
             Est. 2024
@@ -604,27 +608,27 @@ export default function App({ session }) {
 
         <ul className="nav-menu">
           <li className="nav-item">
-            <button className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
+            <button className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => navTo('dashboard')}>
               <LayoutDashboard className="nav-icon" /><span>Dashboard</span>
             </button>
           </li>
           <li className="nav-item">
-            <button className={`nav-link ${activeTab === 'conversaciones' ? 'active' : ''}`} onClick={() => setActiveTab('conversaciones')}>
+            <button className={`nav-link ${activeTab === 'conversaciones' ? 'active' : ''}`} onClick={() => navTo('conversaciones')}>
               <MessageSquare className="nav-icon" /><span>Conversaciones</span>
             </button>
           </li>
           <li className="nav-item">
-            <button className={`nav-link ${activeTab === 'reservas' ? 'active' : ''}`} onClick={() => setActiveTab('reservas')}>
+            <button className={`nav-link ${activeTab === 'reservas' ? 'active' : ''}`} onClick={() => navTo('reservas')}>
               <Calendar className="nav-icon" /><span>Reservas</span>
             </button>
           </li>
           <li className="nav-item">
-            <button className={`nav-link ${activeTab === 'inversores' ? 'active' : ''}`} onClick={() => setActiveTab('inversores')}>
+            <button className={`nav-link ${activeTab === 'inversores' ? 'active' : ''}`} onClick={() => navTo('inversores')}>
               <Users className="nav-icon" /><span>Inversores</span>
             </button>
           </li>
           <li className="nav-item">
-            <button className={`nav-link ${activeTab === 'configuracion-bot' ? 'active' : ''}`} onClick={() => setActiveTab('configuracion-bot')}>
+            <button className={`nav-link ${activeTab === 'configuracion-bot' ? 'active' : ''}`} onClick={() => navTo('configuracion-bot')}>
               <Bot className="nav-icon" /><span>Panel Admin</span>
             </button>
           </li>
@@ -656,6 +660,9 @@ export default function App({ session }) {
       <main className="main-content">
         <header className="app-header">
           <div className="header-title-section">
+            <button className="sidebar-hamburger-btn" onClick={() => setSidebarOpen(prev => !prev)} aria-label="Menú">
+              <span /><span /><span />
+            </button>
             <span className="header-title">{getTabTitle()}</span>
           </div>
           <div className="header-status-bar">
