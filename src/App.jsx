@@ -178,11 +178,11 @@ export default function App({ session }) {
     supabase
       .from('conversations')
       .select('*')
-      .is('deleted_at', null)
       .order('updated_at', { ascending: false })
       .then(({ data, error }) => {
         if (error) { console.error('[Panel] Error cargando conversaciones:', error); return; }
-        const mapped = (data || []).map(mapConversation);
+        // Filtrar soft-deleted client-side (funciona antes y después de la migración)
+        const mapped = (data || []).filter(c => !c.deleted_at).map(mapConversation);
         setConversations(mapped);
         if (mapped.length > 0 && !selectedConvId) setSelectedConvId(mapped[0].id);
       });
