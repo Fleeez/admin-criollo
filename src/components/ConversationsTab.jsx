@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
-import { Search, Send, MessageSquare, ArrowLeft, Bot, User, Volume2, Volume1, VolumeX } from 'lucide-react';
+import { Search, Send, MessageSquare, ArrowLeft, Bot, User, Volume2, Volume1, VolumeX, Trash2, Eraser } from 'lucide-react';
 
 // Deterministic gradient per contact name
 function getAvatarGradient(name = '') {
@@ -32,6 +32,9 @@ export default function ConversationsTab({
   onToggleBot,
   onSendMessage,
   onLoadMoreMessages,
+  onDeleteConversation,
+  onClearChat,
+  onShowPapelera,
   notifVolume = 0.7,
   notifMuted  = false,
   onVolumeChange,
@@ -42,6 +45,7 @@ export default function ConversationsTab({
   const [messageText, setMessageText]   = useState('');
   const [inputFocused, setInputFocused] = useState(false);
   const [mobileView, setMobileView]     = useState('list');
+  const [confirmModal, setConfirmModal] = useState(null); // null | 'delete' | 'clear'
 
   const messagesEndRef       = useRef(null);
   const textareaRef          = useRef(null);
@@ -160,7 +164,17 @@ export default function ConversationsTab({
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <div className={`chat-list-panel ${mobileView === 'chat' ? 'hidden-mobile' : ''}`}>
         <div className="chat-list-header">
-          <h3 className="chat-list-title">Conversaciones</h3>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+            <h3 className="chat-list-title" style={{ marginBottom: 0 }}>Conversaciones</h3>
+            <button
+              type="button"
+              onClick={onShowPapelera}
+              title="Ver papelera"
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '2px 4px' }}
+            >
+              <Trash2 size={13} /> Papelera
+            </button>
+          </div>
           <p className="chat-list-subtitle">{conversations.length} activa{conversations.length !== 1 ? 's' : ''}</p>
           <div className="search-input-wrapper">
             <Search className="search-icon" />
@@ -290,6 +304,25 @@ export default function ConversationsTab({
                 <span className="slider" />
               </label>
             </div>
+            <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
+              <button
+                type="button"
+                className="btn-icon-sm"
+                onClick={() => setConfirmModal('clear')}
+                title="Limpiar chat"
+              >
+                <Eraser size={15} />
+              </button>
+              <button
+                type="button"
+                className="btn-icon-sm"
+                onClick={() => setConfirmModal('delete')}
+                title="Borrar conversación"
+                style={{ color: '#D4574E', borderColor: 'rgba(212,87,78,0.4)' }}
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
           </div>
 
           {/* Messages */}
@@ -358,6 +391,40 @@ export default function ConversationsTab({
           </div>
           <p className="chat-empty-title">Seleccioná una conversación</p>
           <p className="chat-empty-sub">Supervisá y respondé mensajes de WhatsApp en tiempo real.</p>
+        </div>
+      )}
+
+      {/* ── Modal de confirmación ────────────────────────────────────────── */}
+      {confirmModal && (
+        <div className="modal-overlay" onClick={() => setConfirmModal(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <h3 style={{ marginBottom: 8, fontSize: 18, fontWeight: 700 }}>
+              {confirmModal === 'delete' ? '¿Borrar conversación?' : '¿Limpiar chat?'}
+            </h3>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 24, fontSize: 14, lineHeight: 1.5 }}>
+              {confirmModal === 'delete'
+                ? 'La conversación y todos sus mensajes se moverán a la papelera. Podés restaurarla dentro de los próximos 7 días.'
+                : 'Se eliminarán todos los mensajes de este chat. La conversación seguirá activa en la lista.'}
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setConfirmModal(null)}
+                style={{ background: 'transparent', border: '1px solid var(--border-color)', borderRadius: 8, padding: '9px 18px', cursor: 'pointer', color: 'var(--text-secondary)', fontWeight: 600, fontSize: 13 }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (confirmModal === 'delete') onDeleteConversation?.(selectedConv?.id);
+                  else onClearChat?.(selectedConv?.id);
+                  setConfirmModal(null);
+                }}
+                style={{ background: 'rgba(212,87,78,0.12)', border: '1px solid rgba(212,87,78,0.4)', color: '#D4574E', borderRadius: 8, padding: '9px 18px', cursor: 'pointer', fontWeight: 700, fontSize: 13 }}
+              >
+                {confirmModal === 'delete' ? 'Mover a papelera' : 'Limpiar chat'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

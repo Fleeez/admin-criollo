@@ -36,3 +36,10 @@ CREATE POLICY "integraciones_authenticated"
 -- FROM information_schema.columns
 -- WHERE table_name = 'integraciones'
 -- ORDER BY ordinal_position;
+
+-- ── Papelera de conversaciones (soft-delete) ──────────────────────────────────
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE mensajes      ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_conversations_deleted ON conversations (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_mensajes_deleted      ON mensajes      (deleted_at);

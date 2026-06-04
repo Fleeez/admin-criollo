@@ -10,6 +10,7 @@ import InversoresTab from './components/InversoresTab';
 import ChatDrawer from './components/ChatDrawer';
 import ConfiguracionBotTab from './components/ConfiguracionBotTab';
 import ErrorBoundary from './components/ErrorBoundary';
+import PapeleraConversaciones from './components/PapeleraConversaciones';
 
 // ── Notification sound (Web Audio API — no external files) ───────────────────
 function playNotificationSound(volume, muted) {
@@ -106,8 +107,10 @@ export default function App({ session }) {
   const [notifMuted, setNotifMuted]     = useState(() =>
     localStorage.getItem('criollo_notif_muted') === '1'
   );
-  const [unreadConvIds, setUnreadConvIds] = useState(new Set());
-  const [notifications, setNotifications] = useState([]);
+  const [unreadConvIds, setUnreadConvIds]     = useState(new Set());
+  const [notifications, setNotifications]     = useState([]);
+  const [trashConversations, setTrashConversations] = useState([]);
+  const [showPapelera, setShowPapelera]       = useState(false);
   const notifRef          = useRef({ volume: 0.7, muted: false });
   const conversationsRef  = useRef([]);
   const selectedConvIdRef = useRef(null);
@@ -175,6 +178,7 @@ export default function App({ session }) {
     supabase
       .from('conversations')
       .select('*')
+      .is('deleted_at', null)
       .order('updated_at', { ascending: false })
       .then(({ data, error }) => {
         if (error) { console.error('[Panel] Error cargando conversaciones:', error); return; }
@@ -319,6 +323,65 @@ export default function App({ session }) {
     ));
   };
 
+  // ── Borrar conversación (soft-delete conv + mensajes) ────────────────────────
+  const handleDeleteConversation = async (convId) => {
+    const conv = conversations.find(c => c.id === convId);
+    if (!conv) return;
+    const now = new Date().toISOString();
+    await supabase.from('mensajes').update({ deleted_at: now }).eq('telefono', conv.phone).is('deleted_at', null);
+    const { error } = await supabase.from('conversations').update({ deleted_at: now }).eq('id', convId);
+    if (error) { addToast('⚠️ Error al borrar la conversación'); return; }
+    setConversations(prev => {
+      const remaining = prev.filter(c => c.id !== convId);
+      setSelectedConvId(remaining[0]?.id || null);
+      return remaining;
+    });
+    setTrashConversations(prev => [{ ...conv, deletedAt: now, messages: [] }, ...prev]);
+    addToast('🗑 Conversación movida a la papelera');
+  };
+
+  // ── Limpiar chat (soft-delete solo mensajes) ──────────────────────────────────
+  const handleClearChat = async (convId) => {
+    const conv = conversations.find(c => c.id === convId);
+    if (!conv) return;
+    const now = new Date().toISOString();
+    const { error } = await supabase.from('mensajes').update({ deleted_at: now }).eq('telefono', conv.phone).is('deleted_at', null);
+    if (error) { addToast('⚠️ Error al limpiar el chat'); return; }
+    setConversations(prev => prev.map(c => c.id === convId ? { ...c, messages: [], hasMoreMessages: false } : c));
+    addToast('✓ Chat limpiado');
+  };
+
+  // ── Restaurar desde papelera ──────────────────────────────────────────────────
+  const handleRestoreConversation = async (convId) => {
+    const conv = trashConversations.find(c => c.id === convId);
+    if (!conv) return;
+    const { error } = await supabase.from('conversations').update({ deleted_at: null }).eq('id', convId);
+    if (error) { addToast('⚠️ Error al restaurar'); return; }
+    await supabase.from('mensajes').update({ deleted_at: null }).eq('telefono', conv.phone).not('deleted_at', 'is', null);
+    setTrashConversations(prev => prev.filter(c => c.id !== convId));
+    setConversations(prev => [{ ...conv, deletedAt: undefined, messages: [] }, ...prev]);
+    addToast('✓ Conversación restaurada');
+  };
+
+  // ── Eliminar permanentemente ──────────────────────────────────────────────────
+  const handlePermanentDelete = async (convId) => {
+    const conv = trashConversations.find(c => c.id === convId);
+    if (!conv) return;
+    await supabase.from('mensajes').delete().eq('telefono', conv.phone);
+    const { error } = await supabase.from('conversations').delete().eq('id', convId);
+    if (error) { addToast('⚠️ Error al eliminar permanentemente'); return; }
+    setTrashConversations(prev => prev.filter(c => c.id !== convId));
+    addToast('🗑 Conversación eliminada permanentemente');
+  };
+
+  // ── Cargar papelera (+ auto-limpiar > 7 días) ─────────────────────────────────
+  const loadTrashConversations = async () => {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    await supabase.from('conversations').delete().lt('deleted_at', sevenDaysAgo).not('deleted_at', 'is', null);
+    const { data } = await supabase.from('conversations').select('*').not('deleted_at', 'is', null).gte('deleted_at', sevenDaysAgo).order('deleted_at', { ascending: false });
+    setTrashConversations((data || []).map(r => ({ ...mapConversation(r), deletedAt: r.deleted_at })));
+  };
+
   // ── Toggle Bruno activo ───────────────────────────────────────────────────────
   const handleToggleBot = async (convId) => {
     const conv = conversations.find(c => c.id === convId);
@@ -454,7 +517,15 @@ export default function App({ session }) {
           />
         );
       case 'conversaciones':
-        return (
+        return showPapelera ? (
+          <PapeleraConversaciones
+            trashConversations={trashConversations}
+            onRestore={handleRestoreConversation}
+            onPermanentDelete={handlePermanentDelete}
+            onBack={() => setShowPapelera(false)}
+            addToast={addToast}
+          />
+        ) : (
           <ConversationsTab
             conversations={conversations}
             selectedConvId={selectedConvId}
@@ -462,6 +533,9 @@ export default function App({ session }) {
             onToggleBot={handleToggleBot}
             onSendMessage={handleSendMessage}
             onLoadMoreMessages={handleLoadMoreMessages}
+            onDeleteConversation={handleDeleteConversation}
+            onClearChat={handleClearChat}
+            onShowPapelera={() => { setShowPapelera(true); loadTrashConversations(); }}
             notifVolume={notifVolume}
             notifMuted={notifMuted}
             onVolumeChange={handleVolumeChange}

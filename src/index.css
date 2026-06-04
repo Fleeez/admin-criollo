@@ -1254,6 +1254,23 @@ input:checked + .slider:before { transform: translateX(20px); }
   align-items: center;
 }
 
+.btn-icon-sm {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 5px 7px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+}
+.btn-icon-sm:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
 .btn-icon-nav {
   width: 36px;
   height: 36px;
