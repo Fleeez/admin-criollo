@@ -4,10 +4,26 @@ import { supabase } from '../lib/supabaseClient';
 
 const FRANQUICIA_ID = 'demo-restaurant';
 
+function parseStarDishes(val) {
+  const empty = [{nombre:'',precio:''},{nombre:'',precio:''},{nombre:'',precio:''}];
+  if (!val) return empty;
+  try {
+    const parsed = JSON.parse(val);
+    if (Array.isArray(parsed)) {
+      const filled = parsed.slice(0, 3).map(p => ({ nombre: p.nombre || '', precio: p.precio || '' }));
+      while (filled.length < 3) filled.push({ nombre: '', precio: '' });
+      return filled;
+    }
+    return [{ nombre: String(val), precio: '' }, { nombre: '', precio: '' }, { nombre: '', precio: '' }];
+  } catch {
+    return [{ nombre: String(val), precio: '' }, { nombre: '', precio: '' }, { nombre: '', precio: '' }];
+  }
+}
+
 export default function ConfiguracionBotTab({ addToast }) {
   const [botEncendido,    setBotEncendido]    = useState(true);
   const [reservasActivas, setReservasActivas] = useState(true);
-  const [platoEstrella,   setPlatoEstrella]   = useState('');
+  const [platosEstrella,  setPlatosEstrella]  = useState([{nombre:'',precio:''},{nombre:'',precio:''},{nombre:'',precio:''}]);
   const [urlPdfMenu,      setUrlPdfMenu]      = useState('');
   const [preciosTexto,    setPreciosTexto]    = useState('');
   const [listaVip,        setListaVip]        = useState([]);
@@ -45,7 +61,7 @@ export default function ConfiguracionBotTab({ addToast }) {
         if (data) {
           setBotEncendido(data.bot_encendido      ?? true);
           setReservasActivas(data.reservas_activas ?? true);
-          setPlatoEstrella(data.plato_estrella     ?? '');
+          setPlatosEstrella(parseStarDishes(data.plato_estrella));
           setUrlPdfMenu(data.url_pdf_menu          ?? '');
           setPreciosTexto(data.precios_texto       ?? '');
           const rawVip = data.lista_blanca_vip;
@@ -102,7 +118,7 @@ export default function ConfiguracionBotTab({ addToast }) {
             franquicia_id:    FRANQUICIA_ID,
             bot_encendido:    botEncendido,
             reservas_activas: reservasActivas,
-            plato_estrella:   platoEstrella.trim()   || null,
+            plato_estrella:   (() => { const f = platosEstrella.filter(p => p.nombre.trim()); return f.length ? JSON.stringify(f) : null; })(),
             url_pdf_menu:     urlPdfMenu.trim()       || null,
             precios_texto:    preciosTexto.trim()     || null,
             lista_blanca_vip: listaVip.filter(v => v.phone.trim()),
@@ -417,17 +433,17 @@ export default function ConfiguracionBotTab({ addToast }) {
           </div>
 
           <div className="form-group" style={{ marginTop: 16 }}>
-            <label className="form-label">Carta / Actualizaciones del Menú</label>
+            <label className="form-label">Actualizaciones y Extras del Menú</label>
             <textarea
               className="form-input"
               rows={8}
-              placeholder={'Sin PDF → escribí la carta completa:\nEntradas: Tabla de fiambres $4.500, Provoleta $2.800\nPrincipales: Bife de chorizo 350g $18.000, Entraña $14.000\n\nCon PDF → solo las novedades de hoy:\nHoy no hay bife de chorizo.\nEspecial del día: Costillar de cerdo $22.000.'}
+              placeholder={'Modificaciones o extras que se suman al menú del PDF:\nHoy no hay Bife de chorizo.\nEspecial del día: Costillar de cerdo $22.000\nTira de Asado 300g → precio actualizado: $32.000'}
               value={preciosTexto}
               onChange={e => setPreciosTexto(e.target.value)}
               style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: 13, lineHeight: 1.6 }}
             />
             <span style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4, display: 'block' }}>
-              Escribí la carta completa (si no tenés PDF) o las novedades del día: especiales, platos agotados, precios actualizados. Bruno usa este texto para responder sobre precios y platos.
+              Modificaciones de precios, platos agotados o especiales del día. Bruno combina esto con el menú del PDF. Si un plato aparece aquí y en el PDF, Bruno usa esta versión (más actualizada).
             </span>
           </div>
         </div>
@@ -439,24 +455,44 @@ export default function ConfiguracionBotTab({ addToast }) {
             <h3 className="form-section-title" style={{ marginBottom: 0 }}>Plato Estrella</h3>
           </div>
           <p className="form-section-desc">
-            El plato que Bruno ofrecerá proactivamente cuando el cliente pregunte qué recomiendas,
-            pida ver la carta o confirme una reserva.
+            Los platos que Bruno mencionará proactivamente cuando el cliente pida recomendaciones o consulte el menú. Podés cargar hasta 3 platos con su precio.
           </p>
 
           <div className="form-group">
             <label className="form-label">
               <Zap size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
-              Plato del Día
+              Platos Estrella (hasta 3)
             </label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="Ej: Bife de chorizo 400g a la parrilla con chimichurri"
-              value={platoEstrella}
-              onChange={e => setPlatoEstrella(e.target.value)}
-            />
+            {platosEstrella.map((plato, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder={`Plato ${i + 1} — Ej: Bife de chorizo 400g`}
+                  value={plato.nombre}
+                  onChange={e => {
+                    const updated = [...platosEstrella];
+                    updated[i] = { ...updated[i], nombre: e.target.value };
+                    setPlatosEstrella(updated);
+                  }}
+                  style={{ flex: 2 }}
+                />
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Precio — Ej: $32.000"
+                  value={plato.precio}
+                  onChange={e => {
+                    const updated = [...platosEstrella];
+                    updated[i] = { ...updated[i], precio: e.target.value };
+                    setPlatosEstrella(updated);
+                  }}
+                  style={{ flex: 1 }}
+                />
+              </div>
+            ))}
             <span style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4, display: 'block' }}>
-              Dejalo vacío para que Bruno no mencione ningún plato especial
+              Dejá vacío para que Bruno no mencione platos especiales.
             </span>
           </div>
         </div>
