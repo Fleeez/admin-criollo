@@ -234,9 +234,9 @@ export default function ConfiguracionBotTab({ addToast }) {
             <div className="stat-icon-wrapper"><Star size={18} /></div>
           </div>
           <span className="stat-value" style={{ fontSize: 15, fontWeight: 600 }}>
-            {platoEstrella || '—'}
+            {platosEstrella.filter(p => p.nombre.trim()).map(p => p.nombre).join(', ') || '—'}
           </span>
-          <span className="stat-desc">Bruno lo recomendará proactivamente</span>
+          <span className="stat-desc">Bruno los recomendará proactivamente</span>
         </div>
       </div>
 
