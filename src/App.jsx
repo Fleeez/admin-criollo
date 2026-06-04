@@ -135,10 +135,23 @@ export default function App({ session }) {
   };
 
   const addNotification = useCallback((type, title, body, convId = null) => {
-    setNotifications(prev => [
-      { id: Date.now(), type, title, body, convId, time: new Date(), read: false },
-      ...prev.slice(0, 49),
-    ]);
+    const now = new Date();
+    const TTL_72H = 72 * 60 * 60 * 1000;
+    setNotifications(prev => {
+      const fresh = prev.filter(n => now - new Date(n.time) < TTL_72H);
+      if (type === 'message' && convId) {
+        const idx = fresh.findIndex(n => n.type === 'message' && n.convId === convId);
+        if (idx !== -1) {
+          const updated = [...fresh];
+          updated[idx] = { ...updated[idx], body, time: now, read: false };
+          return updated;
+        }
+      }
+      return [
+        { id: Date.now(), type, title, body, convId, time: now, read: false },
+        ...fresh.slice(0, 49),
+      ];
+    });
   }, []);
 
   const toggleDarkMode = () => {
