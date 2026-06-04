@@ -81,11 +81,12 @@ function mapConversation(row) {
 function mapMensaje(m) {
   const senderMap = { whatsapp: 'client', bot: 'ai', humano: 'human' };
   return {
-    id:     m.id,
-    sender: senderMap[m.origen] || 'client',
-    text:   m.mensaje,
-    time:   new Date(m.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
-    date:   new Date(m.created_at).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }),
+    id:      m.id,
+    sender:  senderMap[m.origen] || 'client',
+    text:    m.mensaje,
+    time:    new Date(m.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+    date:    new Date(m.created_at).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }),
+    rawDate: m.created_at,
   };
 }
 
@@ -273,15 +274,48 @@ export default function App({ session }) {
     const conv = conversations.find(c => c.id === convId);
     if (!conv || conv.messages.length > 0) return; // ya cargados
 
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase
       .from('mensajes')
       .select('*')
       .eq('telefono', conv.phone)
-      .order('created_at', { ascending: true });
+      .gte('created_at', sixtyDaysAgo)
+      .order('created_at', { ascending: false })
+      .limit(100);
 
     if (error) { console.error('[Panel] Error cargando mensajes:', error); return; }
+    const messages = (data || []).reverse().map(mapMensaje);
     setConversations(prev => prev.map(c =>
-      c.id === convId ? { ...c, messages: (data || []).map(mapMensaje) } : c
+      c.id === convId ? { ...c, messages, hasMoreMessages: data.length === 100 } : c
+    ));
+  };
+
+  // ── Cargar mensajes más antiguos (paginación scroll-up) ───────────────────────
+  const handleLoadMoreMessages = async (convId) => {
+    const conv = conversations.find(c => c.id === convId);
+    if (!conv || !conv.hasMoreMessages || conv.loadingMore) return;
+
+    setConversations(prev => prev.map(c => c.id === convId ? { ...c, loadingMore: true } : c));
+
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from('mensajes')
+      .select('*')
+      .eq('telefono', conv.phone)
+      .gte('created_at', sixtyDaysAgo)
+      .lt('created_at', conv.messages[0]?.rawDate)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      setConversations(prev => prev.map(c => c.id === convId ? { ...c, loadingMore: false } : c));
+      return;
+    }
+    const older = (data || []).reverse().map(mapMensaje);
+    setConversations(prev => prev.map(c =>
+      c.id === convId
+        ? { ...c, messages: [...older, ...c.messages], hasMoreMessages: data.length === 50, loadingMore: false }
+        : c
     ));
   };
 
@@ -427,6 +461,7 @@ export default function App({ session }) {
             onSelectConversation={handleSelectConversation}
             onToggleBot={handleToggleBot}
             onSendMessage={handleSendMessage}
+            onLoadMoreMessages={handleLoadMoreMessages}
             notifVolume={notifVolume}
             notifMuted={notifMuted}
             onVolumeChange={handleVolumeChange}

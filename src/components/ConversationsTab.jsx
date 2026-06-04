@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { Search, Send, MessageSquare, ArrowLeft, Bot, User, Volume2, Volume1, VolumeX } from 'lucide-react';
 
 // Deterministic gradient per contact name
@@ -31,6 +31,7 @@ export default function ConversationsTab({
   onSelectConversation,
   onToggleBot,
   onSendMessage,
+  onLoadMoreMessages,
   notifVolume = 0.7,
   notifMuted  = false,
   onVolumeChange,
@@ -42,8 +43,10 @@ export default function ConversationsTab({
   const [inputFocused, setInputFocused] = useState(false);
   const [mobileView, setMobileView]     = useState('list');
 
-  const messagesEndRef = useRef(null);
-  const textareaRef    = useRef(null);
+  const messagesEndRef       = useRef(null);
+  const textareaRef          = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const prependScrollRef     = useRef(null); // scrollHeight guardado antes de prepend
 
   const VolumeIcon = notifMuted || notifVolume === 0
     ? VolumeX
@@ -51,13 +54,35 @@ export default function ConversationsTab({
 
   const selectedConv = conversations.find(c => c.id === selectedConvId) || conversations[0];
 
+  // Restaurar posición de scroll ANTES del paint cuando se cargan mensajes más viejos
+  useLayoutEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container || prependScrollRef.current === null) return;
+    const delta = container.scrollHeight - prependScrollRef.current;
+    if (delta > 0) container.scrollTop = delta;
+  }, [selectedConv?.messages?.length]);
+
+  // Auto-scroll al fondo en mensajes nuevos; saltear cuando se prependean mensajes viejos
   useEffect(() => {
+    if (prependScrollRef.current !== null) {
+      prependScrollRef.current = null;
+      return;
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [selectedConv?.messages?.length]);
 
   useEffect(() => {
     if (selectedConvId) setMobileView('chat');
   }, [selectedConvId]);
+
+  // Disparar carga de mensajes anteriores al scrollear al tope del chat
+  const handleMessagesScroll = (e) => {
+    const container = e.currentTarget;
+    if (container.scrollTop < 80 && selectedConv?.hasMoreMessages && !selectedConv?.loadingMore) {
+      prependScrollRef.current = container.scrollHeight;
+      onLoadMoreMessages?.(selectedConv.id);
+    }
+  };
 
   // Auto-resize textarea
   const handleTextareaChange = (e) => {
@@ -268,7 +293,17 @@ export default function ConversationsTab({
           </div>
 
           {/* Messages */}
-          <div className="chat-messages-container">
+          <div className="chat-messages-container" ref={messagesContainerRef} onScroll={handleMessagesScroll}>
+            {selectedConv.loadingMore && (
+              <div style={{ textAlign: 'center', padding: '8px 0', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                Cargando mensajes anteriores...
+              </div>
+            )}
+            {!selectedConv.hasMoreMessages && (selectedConv.messages || []).length > 0 && (
+              <div style={{ textAlign: 'center', padding: '8px 0', color: 'var(--text-secondary)', fontSize: '0.72rem', opacity: 0.55 }}>
+                Inicio del historial · últimos 60 días
+              </div>
+            )}
             {(selectedConv.messages || []).length === 0 ? (
               <div className="chat-messages-empty">
                 <MessageSquare size={28} />
